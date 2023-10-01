@@ -58,10 +58,6 @@ ClientAPI::ClientAPI() {
     client = nullptr;
     cache = new Cache();
 
-    GetComponent = nullptr;
-    clientHWND = nullptr;
-    canvas = nullptr;
-
     jsize nVMs;
     jint ret = JNI_GetCreatedJavaVMs(&jvm, 1, &nVMs);
     if (ret != JNI_OK || nVMs == 0) {
@@ -93,128 +89,6 @@ bool ClientAPI::DetachThread(JNIEnv** Thread)
     return !(*Thread);
 }
 
-HWND ClientAPI::GetCanvasHWND() {
-    std::vector<HWND> matchedWindows;
-    EnumWindows(GetHWNDCurrentPID, reinterpret_cast<LPARAM>(&matchedWindows));
-
-    //HWND frameHandle = FindWindowWithClassName(matchedWindows, L"SunAwtFrame");
-    HWND frameHandle = FindWindowWithTitle(matchedWindows, L"RuneLite");
-
-    if (!frameHandle) {
-        DisplayErrorMessage(L"Failed to find frame");
-        return nullptr; // No parent frame found.
-    }
-    HWND canvasHandle = GetWindow(frameHandle, GW_CHILD);
-    if (!canvasHandle) {
-        DisplayErrorMessage(L"Failed to find canvas");
-        return nullptr;
-    }
-    clientHWND = frameHandle;
-    return canvasHandle;
-}
-
-HWND ClientAPI::FindWindowWithClassName(const std::vector<HWND>&windows, const wchar_t* className)
-{
-    wchar_t nameBuffer[128];
-
-    for (auto window : windows)
-    {
-        GetClassNameW(window, nameBuffer, sizeof(nameBuffer) / sizeof(wchar_t));  // Using the Unicode version
-        if (wcscmp(nameBuffer, className) == 0)  // Wide string comparison
-            return window;
-    }
-    DisplayErrorMessage(L"Failed to find window with class name");
-    return nullptr;
-}
-
-HWND ClientAPI::FindWindowWithTitle(const std::vector<HWND>&windows, const wchar_t* windowTitle)
-{
-    wchar_t titleBuffer[256]; // Adjust the size as needed
-
-    for (auto window : windows)
-    {
-        GetWindowTextW(window, titleBuffer, sizeof(titleBuffer) / sizeof(wchar_t));  // Using the Unicode version
-        if (wcscmp(titleBuffer, windowTitle) == 0)  // Wide string comparison
-            return window;
-    }
-    return nullptr;
-}
-
-jobject ClientAPI::GrabCanvas() {
-    HMODULE jvmDLL = GetModuleHandle(L"jvm.dll");
-    if (!jvmDLL) {
-        MessageBoxW(NULL, L"get jvm.ll failure", L"", MB_OK | MB_ICONERROR);
-        return nullptr;
-    }
-
-    ptr_GCJavaVMs getJVMs = (ptr_GCJavaVMs)GetProcAddress(jvmDLL, "JNI_GetCreatedJavaVMs");
-    if (!getJVMs) {
-        MessageBoxW(NULL, L"get jvm failure", L"", MB_OK | MB_ICONERROR);
-        return nullptr;
-    }
-    JNIEnv* thread = nullptr;
-
-    do {
-        getJVMs(&(this->jvm), 1, nullptr);
-        if (!this->jvm) {
-            MessageBoxW(NULL, L"get jvm failure2", L"", MB_OK | MB_ICONERROR);
-            break;
-        }
-
-        this->AttachToThread(&env);
-
-        HMODULE awtDLL = GetModuleHandle(L"awt.dll");
-        if (!awtDLL) {
-            MessageBoxW(NULL, L"get awt dll failure", L"", MB_OK | MB_ICONERROR);
-            break;
-        }
-
-        const char* awtFuncName = (sizeof(void*) == 8) ? "DSGetComponent" : "_DSGetComponent@8";
-        this->GetComponent = (ptr_GetComponent)GetProcAddress(awtDLL, awtFuncName);
-        if (!env || !this->GetComponent) {
-            MessageBoxW(NULL, L"get component failure", L"", MB_OK | MB_ICONERROR);
-            break;
-        }
-
-        HWND canvasHWND = GetCanvasHWND();
-        if (!canvasHWND) {
-            MessageBoxW(NULL, L"get handle failure", L"", MB_OK | MB_ICONERROR);
-            break;
-        }
-        jobject tempCanvas = this->GetComponent(env, (void*)canvasHWND);
-        if (!tempCanvas) {
-            MessageBoxW(NULL, L"get component failure", L"", MB_OK | MB_ICONERROR);
-            break;
-        }
-
-        jclass canvasClass = env->GetObjectClass(tempCanvas);
-        if (!canvasClass) {
-            MessageBoxW(NULL, L"canvas object class failure", L"", MB_OK | MB_ICONERROR);
-            break;
-        }
-
-        jmethodID canvas_getParent = env->GetMethodID(canvasClass, "getParent", "()Ljava/awt/Container;");
-        if (!canvas_getParent) {
-            MessageBoxW(NULL, L"get parent failure", L"", MB_OK | MB_ICONERROR);
-            break;
-        }
-
-        jobject tempClient = env->CallObjectMethod(tempCanvas, canvas_getParent);
-        if (tempClient) {
-            this->canvas = env->NewGlobalRef(tempClient);
-            env->DeleteLocalRef(tempClient);
-            return this->canvas;
-        }
-        else {
-            MessageBoxW(NULL, L"get client failure", L"", MB_OK | MB_ICONERROR);
-            break;
-        }
-        checkAndClearException(env);
-        this->canvas = env->NewGlobalRef(tempClient);
-        return this->canvas;
-    } while (false);
-    return nullptr;
-}
 
 jobject ClientAPI::getClient() {
     jclass runeLiteClass = env->FindClass("net/runelite/client/RuneLite");
@@ -289,10 +163,6 @@ jobject ClientAPI::getClient() {
 }
 
 std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
-    if (!this->env) {
-        MessageBoxW(NULL, L"no env", L"Error", MB_OK | MB_ICONERROR);
-        GrabCanvas();
-    }
     if (this->client == nullptr) {
         getClient();
     }
