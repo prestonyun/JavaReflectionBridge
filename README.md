@@ -47,7 +47,6 @@ class JWrapper:
     def execute(self):
         query = f"{self.targetClass}." + ".".join(self.method_chain)
         self.method_chain = []
-        print("query: ", query)
         return self.api.query(query)
 
 class ChainProxy:
@@ -133,7 +132,7 @@ if __name__ == '__main__':
     print(client.getGameState().execute())
 
 # Example output:
-# Response: LOGIN_SCREEN
+# LOGIN_SCREEN
 ```
 
 ## Adapting to Other Languages
