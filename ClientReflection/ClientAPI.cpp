@@ -34,63 +34,6 @@ bool checkAndClearException(JNIEnv* env) {
     return false;
 }
 
-std::string cleanSignature(const std::string& humanSignature) {
-    std::vector<std::string> keywords = { "public", "protected", "private", "static", "final", "synchronized", "volatile", "transient" };
-    std::string cleanedSignature = humanSignature;
-    for (const auto& keyword : keywords) {
-        size_t pos;
-        std::string spacedKeyword = keyword + " ";  // Add a space to ensure whole word match
-        while ((pos = cleanedSignature.find(spacedKeyword)) != std::string::npos) {
-            cleanedSignature.erase(pos, spacedKeyword.length());
-        }
-    }
-    return cleanedSignature;
-}
-
-const char* extractSignature(const char* humanSignature) {
-    std::unordered_map<std::string, std::string> typeMapping = {
-        {"void", "V"}, {"boolean", "Z"}, {"byte", "B"},
-        {"char", "C"}, {"short", "S"}, {"int", "I"},
-        {"long", "J"}, {"float", "F"}, {"double", "D"}
-    };
-
-    std::string signature = cleanSignature(humanSignature);
-    std::string returnType;
-    std::string paramSignature;
-    size_t spacePos = signature.find(' ');
-    size_t parenPos = signature.find('(');
-
-    if (parenPos != std::string::npos && spacePos != std::string::npos && spacePos < parenPos) {
-        returnType = signature.substr(0, spacePos);
-        std::string params = signature.substr(parenPos + 1, signature.find(')') - parenPos - 1);
-
-        size_t pos = 0;
-        std::string paramType;
-        while ((pos = params.find(',', pos)) != std::string::npos) {
-            paramType = params.substr(0, pos);
-            auto it = typeMapping.find(paramType);
-            paramSignature += (it != typeMapping.end()) ? it->second : "L" + paramType + ";";
-            params.erase(0, pos + 1);
-            pos = 0;
-        }
-
-        auto it = typeMapping.find(params);
-        paramSignature += (it != typeMapping.end()) ? it->second : "L" + params + ";";
-    }
-    else {
-        DisplayErrorMessage(L"Failed to extract signature");
-        return nullptr;
-    }
-
-    std::string jniSignature = "(" + paramSignature + ")";
-
-    auto it = typeMapping.find(returnType);
-    jniSignature += (it != typeMapping.end()) ? it->second : "L" + returnType + ";";
-
-    char* result = _strdup(jniSignature.c_str());
-    return result;
-}
-
 static BOOL CALLBACK GetHWNDCurrentPID(HWND WindowHandle, LPARAM lParam)
 {
     auto handles = reinterpret_cast<std::vector<HWND>*>(lParam);
@@ -345,19 +288,6 @@ jobject ClientAPI::getClient() {
     return client;
 }
 
-DWORD WINAPI ShowMessageBox(LPVOID lpParam) {
-    const char* msg = (const char*)lpParam;
-    int len = MultiByteToWideChar(CP_UTF8, 0, msg, -1, NULL, 0);
-    if (len > 0) {
-        wchar_t* wmsg = new wchar_t[len];
-        MultiByteToWideChar(CP_UTF8, 0, msg, -1, wmsg, len);
-        MessageBox(NULL, wmsg, L"Non-blocking Message Box", MB_OK);
-        delete[] wmsg;
-    }
-    return 0;
-}
-
-
 std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
     if (!this->env) {
         MessageBoxW(NULL, L"no env", L"Error", MB_OK | MB_ICONERROR);
@@ -383,6 +313,7 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
         std::cout << "Method ID: " << method.id << std::endl;
         std::cout << "------------------------" << std::endl;
     }
+    std::cout << "Total number of methods in methodCache: " << this->cache->methodCache.size() << std::endl;
 
     // temp:
     return "";

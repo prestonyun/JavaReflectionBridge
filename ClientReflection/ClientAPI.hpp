@@ -21,7 +21,6 @@ public:
     std::string ProcessInstruction(const std::string& instruction);
     bool AttachToThread(JNIEnv** Thread);
     bool DetachThread(JNIEnv** Thread);
-    void CacheClientMethods(JNIEnv* env, jobject object, const std::string& className);
     jobject getClient();
     jobject GrabCanvas();
     HWND GetCanvasHWND();
