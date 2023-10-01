@@ -35,6 +35,12 @@ To inject the compiled DLL into the target Java process, you can use the injecto
 #### Python Example
 
 ```python
+import injector
+import pywintypes
+import threading
+import win32file
+import os
+
 class JWrapper:
     def __init__(self, targetClass):
         self.targetClass = targetClass
@@ -70,7 +76,7 @@ class RemoteAPI:
             pid = find_game_client_pid()
             injector.Injector.inject(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ClientReflection.dll"), find_game_client_pid())
         except Exception as e:
-            print("Error injecting JShell.dll: ", e)
+            print("Error injecting DLL: ", e)
         self.pipe_name = r'\\.\pipe\clientpipe'
         self.handle = None
         self.encoding = encoding
