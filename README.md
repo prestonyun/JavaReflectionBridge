@@ -74,7 +74,7 @@ class RemoteAPI:
     def __init__(self, encoding='utf-8'):
         try:
             pid = find_game_client_pid()
-            injector.Injector.inject(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ClientReflection.dll"), find_game_client_pid())
+            injector.Injector.inject(os.path.join(os.path.dirname(os.path.abspath(__file__)), "JRB.dll"), find_game_client_pid())
         except Exception as e:
             print("Error injecting DLL: ", e)
         self.pipe_name = r'\\.\pipe\clientpipe'
