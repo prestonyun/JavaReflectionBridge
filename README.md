@@ -9,6 +9,9 @@ The Java Reflection Bridge (JRB) is a dynamic linking library written in C++ des
 - Utilizes Java reflection to discover and cache method signatures, IDs, return types, and reference objects from the JVM.
 - Executes the method calls using the Java Native Interface (JNI) reflection.
 - Returns the result of the method execution back to the external application.
+- Caches object declared methods for later use.
+- ![Method caching](https://github.com/prestonyun/JavaReflectionBridge/assets/40635145/c7399499-6470-4169-a6ff-64ece2487146)
+
 
 ## Getting Started
 
