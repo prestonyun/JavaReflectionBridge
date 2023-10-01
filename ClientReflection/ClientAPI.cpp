@@ -33,13 +33,61 @@ bool checkAndClearException(JNIEnv* env) {
     return false;
 }
 
-std::string extractSignature(const std::string& str) {
-    size_t start = str.find('(');
-    size_t end = str.find(')');
-    if (start != std::string::npos && end != std::string::npos && start < end) {
-        return str.substr(start, end - start + 1);
+std::string cleanSignature(const std::string& humanSignature) {
+    std::vector<std::string> keywords = { "public", "protected", "private", "static", "final", "synchronized", "volatile", "transient" };
+    std::string cleanedSignature = humanSignature;
+    for (const auto& keyword : keywords) {
+        size_t pos;
+        std::string spacedKeyword = keyword + " ";  // Add a space to ensure whole word match
+        while ((pos = cleanedSignature.find(spacedKeyword)) != std::string::npos) {
+            cleanedSignature.erase(pos, spacedKeyword.length());
+        }
     }
-    return "";
+    return cleanedSignature;
+}
+
+const char* extractSignature(const char* humanSignature) {
+    std::unordered_map<std::string, std::string> typeMapping = {
+        {"void", "V"}, {"boolean", "Z"}, {"byte", "B"},
+        {"char", "C"}, {"short", "S"}, {"int", "I"},
+        {"long", "J"}, {"float", "F"}, {"double", "D"}
+    };
+
+    std::string signature = cleanSignature(humanSignature);
+    std::string returnType;
+    std::string paramSignature;
+    size_t spacePos = signature.find(' ');
+    size_t parenPos = signature.find('(');
+
+    if (parenPos != std::string::npos && spacePos != std::string::npos && spacePos < parenPos) {
+        returnType = signature.substr(0, spacePos);
+        std::string params = signature.substr(parenPos + 1, signature.find(')') - parenPos - 1);
+
+        size_t pos = 0;
+        std::string paramType;
+        while ((pos = params.find(',', pos)) != std::string::npos) {
+            paramType = params.substr(0, pos);
+            auto it = typeMapping.find(paramType);
+            paramSignature += (it != typeMapping.end()) ? it->second : "L" + paramType + ";";
+            params.erase(0, pos + 1);
+            pos = 0;
+        }
+
+        auto it = typeMapping.find(params);
+        paramSignature += (it != typeMapping.end()) ? it->second : "L" + params + ";";
+    }
+    else {
+        DisplayErrorMessage(L"Failed to extract signature");
+        return nullptr;
+    }
+
+    std::string jniSignature = "(" + paramSignature + ")";
+
+    auto it = typeMapping.find(returnType);
+    jniSignature += (it != typeMapping.end()) ? it->second : "L" + returnType + ";";
+
+    char* result = _strdup(jniSignature.c_str());
+    return result;
 }
 
 static BOOL CALLBACK GetHWNDCurrentPID(HWND WindowHandle, LPARAM lParam)
@@ -344,18 +392,12 @@ void ClientAPI::CacheClientMethods(JNIEnv* env, jobject object, const std::strin
         const char* nameStr = env->GetStringUTFChars(nameJavaStr, 0);
         //ShowMessageBox((LPVOID)nameStr);
         const char* signatureStr = env->GetStringUTFChars(signatureJavaStr, 0);
-        ShowMessageBox((LPVOID)signatureStr);
 
-        std::string methodName(nameStr);
-        std::string fullSignature(signatureStr);
+        std::string key = className + "::" + nameStr;
+        const char* actualSignature = extractSignature(signatureStr);
 
-        std::string actualSignature = extractSignature(fullSignature);
-
-        std::string key = className + "::" + methodName;
-        std::string comb = key + " " + actualSignature;
-
-        //CreateThread(NULL, 0, ShowMessageBox, (LPVOID)key.c_str(), NULL, 0);
-        this->cache->getMethod(env, key, methodClass, methodName, actualSignature);
+        printf("Signature: %s\n", actualSignature ? actualSignature : "null");
+        this->cache->getMethod(env, key, methodClass, nameStr, actualSignature);
         // Clean up local references
         env->ReleaseStringUTFChars(nameJavaStr, nameStr);
         env->DeleteLocalRef(nameJavaStr);
@@ -389,7 +431,7 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
         ss.str("");  // Clear the stringstream
         ss << "Key: " << pair.first << "\n";
         ss << "Method ID: " << pair.second.id << "\n";
-        ss << "Signature: " << pair.second.signature << "\n\n";
+        ss << "Signature: " << (pair.second.signature ? pair.second.signature : "null") << "\n\n";
 
         int slength = static_cast<int>(ss.str().length()) + 1;
         int len = MultiByteToWideChar(CP_UTF8, 0, ss.str().c_str(), slength, NULL, 0);

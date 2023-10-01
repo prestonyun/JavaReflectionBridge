@@ -10,10 +10,11 @@ public:
     // Struct to hold method information.
     struct Method {
         jmethodID id;
-        std::string signature;
+        const char* signature;
 
-        Method() : id(nullptr), signature("") {} // default constructor
-        Method(jmethodID id, const std::string& sig) : id(id), signature(sig) {} // parameterized constructor
+        Method() : id(nullptr), signature(nullptr) {}
+        Method(jmethodID id, const char* sig) : id(id), signature(_strdup(sig)) {}
+        ~Method() { free((void*)signature); }  // destructor to free the allocated memory
     };
 
     // Cache for method IDs, using className::methodName as the key.
@@ -24,13 +25,13 @@ public:
     std::unordered_map<std::string, jfieldID> fieldCache;
 
     // Method to get a Method struct from the cache, or find and add it to the cache.
-    Method getMethod(JNIEnv* env, const std::string& key, jclass clazz, const std::string name, const std::string sig) {
+    Method getMethod(JNIEnv* env, const std::string& key, jclass clazz, const char* name, const char* sig) {
         auto it = methodCache.find(key);
         if (it != methodCache.end()) {
             return it->second;
         }
 
-        jmethodID methodID = env->GetMethodID(clazz, name.c_str(), sig.c_str());
+        jmethodID methodID = env->GetMethodID(clazz, name, sig);
         if (env->ExceptionCheck()) {
             // Get the exception object
             jthrowable exception = env->ExceptionOccurred();
@@ -42,6 +43,9 @@ public:
 
         Method method(methodID, sig);
         methodCache[key] = method;
+
+        printf("Key: %s\n", key.c_str());
+        printf("Signature: %s\n", sig ? sig : "null");
         return method;
     }
 
