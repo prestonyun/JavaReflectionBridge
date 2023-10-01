@@ -11,7 +11,6 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& c
         return;  // Return early or handle the error
     }
 
-
     jclass classClass = env->FindClass("java/lang/Class");
     jmethodID getDeclaredMethodsMethod = env->GetMethodID(classClass, "getDeclaredMethods", "()[Ljava/lang/reflect/Method;");
     jobjectArray methodArray = (jobjectArray)env->CallObjectMethod(objectClass, getDeclaredMethodsMethod);
@@ -48,7 +47,7 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& c
 
         signature += returnType;  // Append the return type to the signature
 
-        std::string key = className + "::" + nameStr;
+        std::string key = className + "." + nameStr;
 
         jmethodID methodExists = env->GetMethodID(objectClass, nameStr, signature.c_str());
         if (env->ExceptionCheck()) {
@@ -56,7 +55,7 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& c
             methodExists = env->GetStaticMethodID(objectClass, nameStr, signature.c_str());
             if (env->ExceptionCheck()) {
                 env->ExceptionClear();  // Clear any exception thrown above
-                fprintf(stderr, "Method %s::%s with signature %s does not exist or is not accessible\n",
+                fprintf(stderr, "Method %s.%s with signature %s does not exist or is not accessible\n",
                     className.c_str(), nameStr, signature.c_str());
                 continue;  // Skip this method and continue with the next
             }
@@ -65,7 +64,7 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& c
         // If we reach here, the method exists and is accessible. Now get its ID.
         jmethodID methodID = methodExists;
 
-        Method method(methodID, nameStr, signature, returnType);
+        Method method(methodID, methodObject, nameStr, signature, returnType);
         methodCache[key] = method;
 
         // Clean up local references
@@ -167,27 +166,62 @@ std::string Cache::getClassSignature(JNIEnv* env, jclass clazz) {
     return signature;
 }
 
-Cache::Method Cache::getMethod(JNIEnv* env, const std::string& key, jclass clazz, const char* name, const char* sig, const char* ret_type) {
+std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
+    // 1. Parse the input string to get the class and method name
+    std::string::size_type dot_pos = input.find('.');
+    if (dot_pos == std::string::npos) {
+        throw std::runtime_error("Invalid input string format");
+    }
+    std::string class_name = input.substr(0, dot_pos);
+    std::string method_name = input.substr(dot_pos + 1, input.find('(') - dot_pos - 1);
+
+    // Construct the key
+    std::string key = class_name + "." + method_name;
+
+    // 2. Locate the Method
     auto it = methodCache.find(key);
-    if (it != methodCache.end()) {
-        return it->second;
+    if (it == methodCache.end()) {
+        printf("Method %s not found\n", key.c_str());
+        return "";
     }
+    Method& method = it->second;
 
-    jmethodID methodID = env->GetMethodID(clazz, name, sig);
-    if (env->ExceptionCheck()) {
-        jthrowable exception = env->ExceptionOccurred();
-        env->ExceptionClear();
-        return { nullptr, "", "", ""};
+    // 3. Execute the Method
+    if (method.return_type == "V") {  // void return type
+        env->CallVoidMethod(method.object, method.id);
     }
+    else if (method.return_type == "I") {  // int return type
+        jint result = env->CallIntMethod(method.object, method.id);
+        return std::to_string(result);
+    }
+    else if (method.return_type == "Ljava/lang/String;") {  // String return type
+        jstring result = (jstring)env->CallObjectMethod(method.object, method.id);
+        const char* chars = env->GetStringUTFChars(result, nullptr);
+        std::string result_str(chars);
+        env->ReleaseStringUTFChars(result, chars);
+        return result_str;
+    }
+    else {  // Other non-primitive types
+        jobject result = env->CallObjectMethod(method.object, method.id);
+        if (result != nullptr) {
+            printf("Result is not null\n");
+            jclass resultClass = env->GetObjectClass(result);
+            jmethodID toStringMethod = env->GetMethodID(resultClass, "toString", "()Ljava/lang/String;");
+            if (toStringMethod != nullptr) {
+                jstring resultStr = (jstring)env->CallObjectMethod(result, toStringMethod);
+                const char* chars = env->GetStringUTFChars(resultStr, nullptr);
+                std::string result_str(chars);
+                env->ReleaseStringUTFChars(resultStr, chars);
+                return result_str;
+            }
+        }
+    }
+    // ... Handle other return types similarly
 
-    // temp:
-    return { nullptr, "", "", "" };
+    // 4. Convert the Result
+    // This step is handled in each of the above cases.
 
-    //Method method(methodID, sig, ret_type);
-    //methodCache[key] = method;
-
-    //printf("Key: %s\n Signature: %s\n Return Type: %s", key.c_str(), sig ? sig : "null", ret_type ? ret_type : "null");
-    //return method;
+    return "";  // Default return for void methods or unhandled types
 }
 
 jclass Cache::getClass(JNIEnv* env, const std::string& name, jobject object) {
@@ -239,6 +273,27 @@ jfieldID Cache::getFieldID(JNIEnv* env, const std::string& key, jclass clazz, co
 
     fieldCache[key] = fieldID;
     return fieldID;
+}
+
+void Cache::cleanup(JNIEnv* env) {
+    // Iterate through each Method in the methodCache and delete the global reference to the jobject
+    for (auto& entry : methodCache) {
+        Method& method = entry.second;
+        if (method.object != nullptr) {
+            env->DeleteGlobalRef(method.object);
+        }
+    }
+
+    // Optionally, you could also clean up global references to jclass and jobject in classCache and objectCache respectively
+    for (auto& entry : classCache) {
+        jclass clazz = entry.second;
+        env->DeleteGlobalRef(clazz);
+    }
+
+    for (auto& entry : objectCache) {
+        jobject object = entry.second;
+        env->DeleteGlobalRef(object);
+    }
 }
 
 Cache::~Cache() {

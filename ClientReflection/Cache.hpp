@@ -10,18 +10,15 @@ public:
     // Struct to hold method information.
     struct Method {
         jmethodID id;
+        jobject object;
         std::string name;
         std::string signature;
         std::string return_type;
 
-        Method() : id(nullptr) {}
-        Method(jmethodID id, const std::string& name, const std::string& signature, const std::string& return_type)
-            : id(id), name(name), signature(signature), return_type(return_type) {}
+        Method() : id(nullptr), object(nullptr) {}
+        Method(jmethodID id, jobject object, const std::string& name, const std::string& signature, const std::string& return_type)
+            : id(id), object(object), name(name), signature(signature), return_type(return_type) {}
     };
-
-
-    // Method to get a Method struct from the cache, or find and add it to the cache.
-    Method getMethod(JNIEnv* env, const std::string& key, jclass clazz, const char* name, const char* sig, const char* ret_type);
 
     jclass getClass(JNIEnv* env, const std::string& name, jobject object);
     jobject getObject(JNIEnv* env, const std::string& key, jclass clazz, const char* name, const char* sig);
@@ -31,6 +28,9 @@ public:
     std::string convertToSignature(JNIEnv* env, jobjectArray paramTypeArray);
     std::string getClassSignature(JNIEnv* env, jclass clazz);
     std::string convertToReturnType(JNIEnv* env, jobject returnTypeObject);
+    std::string executeMethod(JNIEnv* env, const std::string& input);
+
+    void cleanup(JNIEnv* env);
 
     Cache() = default;
     ~Cache();

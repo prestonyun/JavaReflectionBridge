@@ -171,7 +171,6 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
         return "";  // Return early to avoid undefined behavior
     }
     this->cache->cacheObjectMethods(env, client, "Client");
-    DisplayErrorMessage(L"methods cached");
 
     for (const auto& entry : this->cache->methodCache) {
         const std::string& key = entry.first;
@@ -185,7 +184,14 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
     }
     std::cout << "Total number of methods in methodCache: " << this->cache->methodCache.size() << std::endl;
 
-    // temp:
-    return "";
+    std::string response = this->cache->executeMethod(env, instruction);
+    if (env->ExceptionCheck()) {
+		MessageBoxW(NULL, L"Failed to execute method", L"Error", MB_OK | MB_ICONERROR);
+        env->ExceptionDescribe();
+		env->ExceptionClear();
+		return ""; // or handle the error as appropriate
+	}
+    std::cout << "Response: " << response << std::endl;
+    return response;
 }
 
