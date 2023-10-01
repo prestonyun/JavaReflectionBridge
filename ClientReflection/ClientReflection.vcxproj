@@ -149,6 +149,7 @@
     <ClInclude Include="Pipeline.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Cache.cpp" />
     <ClCompile Include="ClientAPI.cpp" />
     <ClCompile Include="ClientAPI.hpp" />
     <ClCompile Include="dllmain.cpp" />

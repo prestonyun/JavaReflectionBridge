@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "ClientAPI.hpp"
+#include <iostream>
 
 void DisplayErrorMessage(const std::wstring& message) {
     MessageBoxW(NULL, message.c_str(), L"Error", MB_OK | MB_ICONERROR);
@@ -113,6 +114,10 @@ ClientAPI::ClientAPI() {
     injector = nullptr;
     client = nullptr;
     cache = new Cache();
+
+    GetComponent = nullptr;
+    clientHWND = nullptr;
+    canvas = nullptr;
 
     jsize nVMs;
     jint ret = JNI_GetCreatedJavaVMs(&jvm, 1, &nVMs);
@@ -353,64 +358,6 @@ DWORD WINAPI ShowMessageBox(LPVOID lpParam) {
 }
 
 
-void ClientAPI::CacheClientMethods(JNIEnv* env, jobject object, const std::string& className) {
-    jclass objectClass = env->GetObjectClass(object);
-
-    jclass classClass = env->FindClass("java/lang/Class");
-    if (checkAndClearException(env)) {
-        MessageBoxW(NULL, L"Failed to find Class class", L"Error", MB_OK | MB_ICONERROR);
-        return;
-    }
-    jmethodID getDeclaredMethodsMethod = env->GetMethodID(classClass, "getDeclaredMethods", "()[Ljava/lang/reflect/Method;");
-    jobjectArray methodArray = (jobjectArray)env->CallObjectMethod(objectClass, getDeclaredMethodsMethod);
-
-    if (checkAndClearException(env)) {
-        MessageBoxW(NULL, L"Failed to find method array", L"Error", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    jsize methodCount = env->GetArrayLength(methodArray);
-
-    for (jsize i = 0; i < methodCount; i++) {
-        jobject methodObject = env->GetObjectArrayElement(methodArray, i);
-        if (checkAndClearException(env)) {
-            MessageBoxW(NULL, L"Failed to find array element", L"Error", MB_OK | MB_ICONERROR);
-            return;
-        }
-
-        jclass methodClass = env->GetObjectClass(methodObject);
-        jmethodID getNameMethod = env->GetMethodID(methodClass, "getName", "()Ljava/lang/String;");
-        jstring nameJavaStr = (jstring)env->CallObjectMethod(methodObject, getNameMethod);
-
-        jmethodID toStringMethod = env->GetMethodID(methodClass, "toString", "()Ljava/lang/String;");
-        jstring signatureJavaStr = (jstring)env->CallObjectMethod(methodObject, toStringMethod);
-        if (checkAndClearException(env)) {
-            MessageBoxW(NULL, L"Failed to find find sig", L"Error", MB_OK | MB_ICONERROR);
-            return;
-        }
-
-        const char* nameStr = env->GetStringUTFChars(nameJavaStr, 0);
-        //ShowMessageBox((LPVOID)nameStr);
-        const char* signatureStr = env->GetStringUTFChars(signatureJavaStr, 0);
-
-        std::string key = className + "::" + nameStr;
-        const char* actualSignature = extractSignature(signatureStr);
-
-        printf("Signature: %s\n", actualSignature ? actualSignature : "null");
-        this->cache->getMethod(env, key, methodClass, nameStr, actualSignature);
-        // Clean up local references
-        env->ReleaseStringUTFChars(nameJavaStr, nameStr);
-        env->DeleteLocalRef(nameJavaStr);
-        env->DeleteLocalRef(methodObject);
-        env->DeleteLocalRef(methodClass);
-    }
-
-    // Clean up
-    env->DeleteLocalRef(classClass);
-    env->DeleteLocalRef(objectClass);
-    env->DeleteLocalRef(methodArray);
-}
-
 std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
     if (!this->env) {
         MessageBoxW(NULL, L"no env", L"Error", MB_OK | MB_ICONERROR);
@@ -423,26 +370,21 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
         MessageBoxW(NULL, L"Invalid state: no env or client", L"Error", MB_OK | MB_ICONERROR);
         return "";  // Return early to avoid undefined behavior
     }
-    CacheClientMethods(env, client, "ClientClass");
+    this->cache->cacheObjectMethods(env, client, "Client");
     DisplayErrorMessage(L"methods cached");
 
-    std::stringstream ss;
-    for (const auto& pair : this->cache->methodCache) {
-        ss.str("");  // Clear the stringstream
-        ss << "Key: " << pair.first << "\n";
-        ss << "Method ID: " << pair.second.id << "\n";
-        ss << "Signature: " << (pair.second.signature ? pair.second.signature : "null") << "\n\n";
-
-        int slength = static_cast<int>(ss.str().length()) + 1;
-        int len = MultiByteToWideChar(CP_UTF8, 0, ss.str().c_str(), slength, NULL, 0);
-        if (len > 0) {
-            wchar_t* buf = new wchar_t[len];
-            MultiByteToWideChar(CP_UTF8, 0, ss.str().c_str(), slength, buf, len);
-            std::wstring r(buf);
-            DisplayErrorMessage(r);
-            delete[] buf;  // Free memory at the end of each iteration
-        }
+    for (const auto& entry : this->cache->methodCache) {
+        const std::string& key = entry.first;
+        const Cache::Method& method = entry.second;
+        std::cout << "Key: " << key << std::endl;
+        std::cout << "Method Name: " << method.name << std::endl;
+        std::cout << "Signature: " << method.signature << std::endl;
+        std::cout << "Return Type: " << method.return_type << std::endl;
+        std::cout << "Method ID: " << method.id << std::endl;
+        std::cout << "------------------------" << std::endl;
     }
-    return ss.str();
+
+    // temp:
+    return "";
 }
 
