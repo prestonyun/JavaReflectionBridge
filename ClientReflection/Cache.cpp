@@ -6,9 +6,9 @@
 void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& className) {
     jclass objectClass = env->GetObjectClass(object);
     if (objectClass == nullptr || env->ExceptionCheck()) {
-        env->ExceptionDescribe();  // Optionally print the exception
+        env->ExceptionDescribe();
         env->ExceptionClear();
-        return;  // Return early or handle the error
+        return;
     }
 
     jclass classClass = env->FindClass("java/lang/Class");
@@ -21,7 +21,7 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& c
         jobject methodObject = env->GetObjectArrayElement(methodArray, i);
         if (methodObject == nullptr) {
             fprintf(stderr, "Failed to obtain method object at index %d\n", i);
-            continue;  // Skip to the next iteration
+            continue;
         }
 
 
@@ -29,7 +29,7 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& c
         if (methodClass == nullptr || env->ExceptionCheck()) {
             fprintf(stderr, "Failed to obtain method class at index %d\n", i);
             env->ExceptionClear();
-            continue;  // Skip to the next iteration
+            continue;
         }
         jmethodID getNameMethod = env->GetMethodID(methodClass, "getName", "()Ljava/lang/String;");
         jstring nameJavaStr = (jstring)env->CallObjectMethod(methodObject, getNameMethod);
@@ -45,19 +45,19 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& c
         std::string signature = convertToSignature(env, paramTypeArray);
         std::string returnType = convertToReturnType(env, returnTypeObject);
 
-        signature += returnType;  // Append the return type to the signature
+        signature += returnType;
 
         std::string key = className + "." + nameStr;
 
         jmethodID methodExists = env->GetMethodID(objectClass, nameStr, signature.c_str());
         if (env->ExceptionCheck()) {
-            env->ExceptionClear();  // Clear any exception thrown above
+            env->ExceptionClear();
             methodExists = env->GetStaticMethodID(objectClass, nameStr, signature.c_str());
             if (env->ExceptionCheck()) {
-                env->ExceptionClear();  // Clear any exception thrown above
+                env->ExceptionClear();
                 fprintf(stderr, "Method %s.%s with signature %s does not exist or is not accessible\n",
                     className.c_str(), nameStr, signature.c_str());
-                continue;  // Skip this method and continue with the next
+                continue;
             }
         }
 
@@ -101,7 +101,7 @@ std::string Cache::convertToSignature(JNIEnv* env, jobjectArray paramTypeArray) 
         jobject paramTypeObject = env->GetObjectArrayElement(paramTypeArray, i);
         jclass paramTypeClass = static_cast<jclass>(paramTypeObject);
         std::string paramTypeSignature = getClassSignature(env, paramTypeClass);
-        paramTypeSignature = replaceDotsWithSlashes(paramTypeSignature);  // Replace dots with slashes
+        paramTypeSignature = replaceDotsWithSlashes(paramTypeSignature);
         signature << paramTypeSignature;
         env->DeleteLocalRef(paramTypeObject);  // Clean up the local reference
     }
@@ -112,7 +112,7 @@ std::string Cache::convertToSignature(JNIEnv* env, jobjectArray paramTypeArray) 
 std::string Cache::convertToReturnType(JNIEnv* env, jobject returnTypeObject) {
     jclass returnTypeClass = static_cast<jclass>(returnTypeObject);
     std::string returnTypeSignature = getClassSignature(env, returnTypeClass);
-    returnTypeSignature = replaceDotsWithSlashes(returnTypeSignature);  // Replace dots with slashes
+    returnTypeSignature = replaceDotsWithSlashes(returnTypeSignature);
     return returnTypeSignature;
 }
 
@@ -123,7 +123,7 @@ std::string Cache::getClassSignature(JNIEnv* env, jclass clazz) {
     jstring nameJavaStr = (jstring)env->CallObjectMethod(clazz, getNameMethod);
     const char* nameStr = env->GetStringUTFChars(nameJavaStr, 0);
     std::string nameStrCpp(nameStr);
-    std::replace(nameStrCpp.begin(), nameStrCpp.end(), '.', '/');  // Replace dots with slashes
+    std::replace(nameStrCpp.begin(), nameStrCpp.end(), '.', '/');
     std::string signature;
     if (strcmp(nameStr, "int") == 0) {
         signature = "I";
@@ -158,7 +158,7 @@ std::string Cache::getClassSignature(JNIEnv* env, jclass clazz) {
     }
     else {
         // Assume object type
-        signature = "L" + nameStrCpp + ";";  // Use the modified string here
+        signature = "L" + nameStrCpp + ";";
     }
     env->ReleaseStringUTFChars(nameJavaStr, nameStr);
     env->DeleteLocalRef(nameJavaStr);
@@ -218,10 +218,7 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
     }
     // ... Handle other return types similarly
 
-    // 4. Convert the Result
-    // This step is handled in each of the above cases.
-
-    return "";  // Default return for void methods or unhandled types
+    return "";
 }
 
 jclass Cache::getClass(JNIEnv* env, const std::string& name, jobject object) {
@@ -243,12 +240,9 @@ jobject Cache::getObject(JNIEnv* env, const std::string& key, jclass clazz, cons
 
     jobject object = env->GetStaticObjectField(clazz, env->GetStaticFieldID(clazz, name, sig));
     if (env->ExceptionCheck()) {
-        // Get the exception object
-        jthrowable exception = env->ExceptionOccurred();
-
-        // Clear the exception to be able to call further JNI methods
+        env->ExceptionDescribe();
         env->ExceptionClear();
-        return nullptr; // or handle the error as appropriate
+        return nullptr;
     }
 
     objectCache[key] = object;
@@ -263,12 +257,9 @@ jfieldID Cache::getFieldID(JNIEnv* env, const std::string& key, jclass clazz, co
 
     jfieldID fieldID = env->GetFieldID(clazz, name, sig);
     if (env->ExceptionCheck()) {
-        // Get the exception object
-        jthrowable exception = env->ExceptionOccurred();
-
-        // Clear the exception to be able to call further JNI methods
+        env->ExceptionDescribe();
         env->ExceptionClear();
-        return nullptr; // or handle the error as appropriate
+        return nullptr;
     }
 
     fieldCache[key] = fieldID;
@@ -284,7 +275,6 @@ void Cache::cleanup(JNIEnv* env) {
         }
     }
 
-    // Optionally, you could also clean up global references to jclass and jobject in classCache and objectCache respectively
     for (auto& entry : classCache) {
         jclass clazz = entry.second;
         env->DeleteGlobalRef(clazz);

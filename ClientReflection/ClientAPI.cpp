@@ -34,22 +34,6 @@ bool checkAndClearException(JNIEnv* env) {
     return false;
 }
 
-static BOOL CALLBACK GetHWNDCurrentPID(HWND WindowHandle, LPARAM lParam)
-{
-    auto handles = reinterpret_cast<std::vector<HWND>*>(lParam);
-    DWORD currentPID = GetCurrentProcessId();
-    DWORD windowPID;
-    GetWindowThreadProcessId(WindowHandle, &windowPID);
-
-    if (currentPID == windowPID)
-    {
-        handles->push_back(WindowHandle);
-    }
-
-
-    return TRUE;
-}
-
 ClientAPI::ClientAPI() {
     jvm = nullptr;
     env = nullptr;
@@ -94,19 +78,19 @@ jobject ClientAPI::getClient() {
     jclass runeLiteClass = env->FindClass("net/runelite/client/RuneLite");
     if (checkAndClearException(env)) {
         MessageBoxW(NULL, L"Failed to find RuneLite class", L"Error", MB_OK | MB_ICONERROR);
-		return nullptr; // or handle the error as appropriate
+		return nullptr;
 	}
 
     jfieldID injectorField = env->GetStaticFieldID(runeLiteClass, "injector", "Lcom/google/inject/Injector;");
     if (checkAndClearException(env)) {
         MessageBoxW(NULL, L"Failed to find injector field", L"Error", MB_OK | MB_ICONERROR);
-        return nullptr; // or handle the error as appropriate
+        return nullptr;
     }
 
     jobject injector = env->GetStaticObjectField(runeLiteClass, injectorField);
     if (checkAndClearException(env)) {
         MessageBoxW(NULL, L"Failed to find injector object field", L"Error", MB_OK | MB_ICONERROR);
-        return nullptr; // or handle the error as appropriate
+        return nullptr;
     }
 
     this->injector = injector;
@@ -114,48 +98,48 @@ jobject ClientAPI::getClient() {
     if (env->ExceptionCheck()) {
         MessageBoxW(NULL, L"Failed to find injector class", L"Error", MB_OK | MB_ICONERROR);
         env->ExceptionClear();
-        return nullptr; // or handle the error as appropriate
+        return nullptr;
     }
 
     jmethodID getInstanceMethod = env->GetMethodID(injectorClass, "getInstance", "(Ljava/lang/Class;)Ljava/lang/Object;");
     if (env->ExceptionCheck()) {
         MessageBoxW(NULL, L"Failed to find injector instance", L"Error", MB_OK | MB_ICONERROR);
         env->ExceptionClear();
-        return nullptr; // or handle the error as appropriate
+        return nullptr;
     }
 
     jobject runeLiteClient = env->CallObjectMethod(injector, getInstanceMethod, runeLiteClass);
     if (env->ExceptionCheck()) {
         MessageBoxW(NULL, L"Failed to call injector method", L"Error", MB_OK | MB_ICONERROR);
         env->ExceptionClear();
-        return nullptr; // or handle the error as appropriate
+        return nullptr;
     }
     jclass runeLiteClientClass = env->GetObjectClass(runeLiteClient);
     if (env->ExceptionCheck()) {
         MessageBoxW(NULL, L"Failed to find client class", L"Error", MB_OK | MB_ICONERROR);
         env->ExceptionClear();
-        return nullptr; // or handle the error as appropriate
+        return nullptr;
     }
 
     jfieldID clientField = env->GetFieldID(runeLiteClientClass, "client", "Lnet/runelite/api/Client;");
     if (env->ExceptionCheck()) {
         MessageBoxW(NULL, L"Failed to find client field", L"Error", MB_OK | MB_ICONERROR);
         env->ExceptionClear();
-        return nullptr; // or handle the error as appropriate
+        return nullptr;
     }
 
     jobject client = env->GetObjectField(runeLiteClient, clientField);
     if (env->ExceptionCheck()) {
         MessageBoxW(NULL, L"Failed to find client object field", L"Error", MB_OK | MB_ICONERROR);
         env->ExceptionClear();
-        return nullptr; // or handle the error as appropriate
+        return nullptr;
     }
 
     jclass clientClass = this->cache->getClass(env, "ClientClass", client);
     if (env->ExceptionCheck()) {
         MessageBoxW(NULL, L"Failed to find client object class", L"Error", MB_OK | MB_ICONERROR);
         env->ExceptionClear();
-        return nullptr; // or handle the error as appropriate
+        return nullptr;
     }
     checkAndClearException(env);
     this->client = env->NewGlobalRef(client);
@@ -168,7 +152,7 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
     }
     if (!this->env || !this->client) {
         MessageBoxW(NULL, L"Invalid state: no env or client", L"Error", MB_OK | MB_ICONERROR);
-        return "";  // Return early to avoid undefined behavior
+        return "";
     }
     this->cache->cacheObjectMethods(env, client, "Client");
 
@@ -189,7 +173,7 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
 		MessageBoxW(NULL, L"Failed to execute method", L"Error", MB_OK | MB_ICONERROR);
         env->ExceptionDescribe();
 		env->ExceptionClear();
-		return ""; // or handle the error as appropriate
+		return "";
 	}
     std::cout << "Response: " << response << std::endl;
     return response;

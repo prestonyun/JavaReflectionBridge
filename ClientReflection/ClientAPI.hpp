@@ -22,7 +22,6 @@ public:
     bool AttachToThread(JNIEnv** Thread);
     bool DetachThread(JNIEnv** Thread);
     jobject getClient();
-    // Initialize cache in JavaAPI constructor
     Cache* cache;
 
 private:
