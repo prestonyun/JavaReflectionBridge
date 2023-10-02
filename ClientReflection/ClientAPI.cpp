@@ -170,7 +170,6 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
 
     std::string response = this->cache->executeMethod(env, instruction);
     if (env->ExceptionCheck()) {
-		MessageBoxW(NULL, L"Failed to execute method", L"Error", MB_OK | MB_ICONERROR);
         env->ExceptionDescribe();
 		env->ExceptionClear();
 		return "";

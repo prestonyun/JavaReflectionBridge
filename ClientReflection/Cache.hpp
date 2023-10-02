@@ -28,6 +28,7 @@ public:
     std::string convertToSignature(JNIEnv* env, jobjectArray paramTypeArray);
     std::string getClassSignature(JNIEnv* env, jclass clazz);
     std::string convertToReturnType(JNIEnv* env, jobject returnTypeObject);
+    std::string executeSingleMethod(JNIEnv* env, const std::string& input);
     std::string executeMethod(JNIEnv* env, const std::string& input);
 
     void cleanup(JNIEnv* env);
