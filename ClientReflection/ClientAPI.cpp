@@ -154,18 +154,8 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
         MessageBoxW(NULL, L"Invalid state: no env or client", L"Error", MB_OK | MB_ICONERROR);
         return "";
     }
-    this->cache->cacheObjectMethods(env, client, "Client");
+    this->cache->cacheObjectMethods(env, client);
 
-    for (const auto& entry : this->cache->methodCache) {
-        const std::string& key = entry.first;
-        const Cache::Method& method = entry.second;
-        std::cout << "Key: " << key << std::endl;
-        std::cout << "Method Name: " << method.name << std::endl;
-        std::cout << "Signature: " << method.signature << std::endl;
-        std::cout << "Return Type: " << method.return_type << std::endl;
-        std::cout << "Method ID: " << method.id << std::endl;
-        std::cout << "------------------------" << std::endl;
-    }
     std::cout << "Total number of methods in methodCache: " << this->cache->methodCache.size() << std::endl;
 
     std::string response = this->cache->executeMethod(env, instruction);

@@ -24,12 +24,15 @@ public:
     jobject getObject(JNIEnv* env, const std::string& key, jclass clazz, const char* name, const char* sig);
     jfieldID getFieldID(JNIEnv* env, const std::string& key, jclass clazz, const char* name, const char* sig);
 
-    void cacheObjectMethods(JNIEnv* env, jobject object, const std::string& className);
+    void addMethodToCache(jmethodID methodID, jobject methodObject, const std::string& name, const std::string& signature, const std::string& returnType, const std::string& className);
+    void cacheObjectMethods(JNIEnv* env, jobject object);
     std::string convertToSignature(JNIEnv* env, jobjectArray paramTypeArray);
     std::string getClassSignature(JNIEnv* env, jclass clazz);
     std::string convertToReturnType(JNIEnv* env, jobject returnTypeObject);
     std::string executeSingleMethod(JNIEnv* env, const std::string& input);
     std::string executeMethod(JNIEnv* env, const std::string& input);
+
+    std::string replaceDotsWithSlashes(const std::string& input);
 
     void cleanup(JNIEnv* env);
 

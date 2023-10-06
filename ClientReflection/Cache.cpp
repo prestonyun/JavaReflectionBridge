@@ -2,8 +2,15 @@
 #include "Cache.hpp"
 #include <cstdio>
 #include <algorithm>
+#include <iostream>
 
-void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& className) {
+void Cache::addMethodToCache(jmethodID methodID, jobject methodObject, const std::string& name, const std::string& signature, const std::string& returnType, const std::string& className) {
+    std::string key = className + "." + name;
+    Method method(methodID, methodObject, name, signature, returnType);
+    methodCache[key] = method;
+}
+
+void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
     jclass objectClass = env->GetObjectClass(object);
     if (objectClass == nullptr || env->ExceptionCheck()) {
         env->ExceptionDescribe();
@@ -11,7 +18,15 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& c
         return;
     }
 
+    
+    jmethodID getNameMethod = env->GetMethodID(objectClass, "getName", "()Ljava/lang/String;");
+    jstring classNameJava = (jstring)env->CallObjectMethod(object, getNameMethod);
+    const char* classNameStr = env->GetStringUTFChars(classNameJava, 0);
+    std::string className(classNameStr);
+    std::cout << "Class name: " << className << std::endl;
+
     jclass classClass = env->FindClass("java/lang/Class");
+
     jmethodID getDeclaredMethodsMethod = env->GetMethodID(classClass, "getDeclaredMethods", "()[Ljava/lang/reflect/Method;");
     jobjectArray methodArray = (jobjectArray)env->CallObjectMethod(objectClass, getDeclaredMethodsMethod);
 
@@ -45,14 +60,14 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& c
         std::string signature = convertToSignature(env, paramTypeArray);
         std::string returnType = convertToReturnType(env, returnTypeObject);
 
-        if (returnType[0] == 'L') {  // It's an object type
-            std::string objectClassName = returnType.substr(1, returnType.length() - 2);  // Remove 'L' and ';'
-            std::replace(objectClassName.begin(), objectClassName.end(), '/', '.');  // Convert slashes to dots
-            if (classCache.find(objectClassName) == classCache.end()) {  // If not already cached
-                jclass objectClass = env->FindClass(objectClassName.c_str());
-                cacheObjectMethods(env, env->NewGlobalRef(object), objectClassName);  // Recursive caching
-            }
-        }
+        //if (returnType[0] == 'L') {  // It's an object type
+        //    std::string objectClassName = returnType.substr(1, returnType.length() - 2);  // Remove 'L' and ';'
+        //    std::replace(objectClassName.begin(), objectClassName.end(), '/', '.');  // Convert slashes to dots
+        //    if (classCache.find(objectClassName) == classCache.end()) {  // If not already cached
+        //        jclass objectClass = env->FindClass(objectClassName.c_str());
+        //        cacheObjectMethods(env, env->NewGlobalRef(object));  // Recursive caching
+        //    }
+        //}
 
         signature += returnType;
 
@@ -75,6 +90,7 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& c
 
         Method method(methodID, methodObject, nameStr, signature, returnType);
         methodCache[key] = method;
+        std::cout << "Key: " << key << std::endl;
 
         // Clean up local references
         env->ReleaseStringUTFChars(nameJavaStr, nameStr);
@@ -91,7 +107,7 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object, const std::string& c
     env->DeleteLocalRef(methodArray);
 }
 
-std::string replaceDotsWithSlashes(const std::string& input) {
+std::string Cache::replaceDotsWithSlashes(const std::string& input) {
     std::string output = input;
     for (size_t pos = 0; pos < output.length(); ++pos) {
         if (output[pos] == '.') {
@@ -240,9 +256,10 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
     }
     methods.push_back(input.substr(pos));  // Push the last method
 
-    std::string currentKey = methods[0].substr(0, methods[0].find('('));
+    std::string currentKey = methods[0]; 
 
     for (const auto& methodStr : methods) {
+        if (methodStr == currentKey) continue;
         std::string methodName = methodStr.substr(0, methodStr.find('('));
         std::string key = currentKey + "." + methodName;
 
@@ -257,17 +274,18 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
         // Execute the Method
         if (method.return_type == "V") {  // void return type
             env->CallVoidMethod(currentObject, method.id);
+            currentKey = "void";  // Since void methods don't return anything, you might want to set a default value
         }
         else if (method.return_type == "I") {  // int return type
             jint result = env->CallIntMethod(currentObject, method.id);
-            // ... Handle integer result if necessary ...
+            currentKey = std::to_string(result);  // Convert jint to std::string and update currentKey
         }
         else if (method.return_type == "Ljava/lang/String;") {  // String return type
             jstring result = (jstring)env->CallObjectMethod(currentObject, method.id);
             const char* chars = env->GetStringUTFChars(result, nullptr);
             std::string result_str(chars);
             env->ReleaseStringUTFChars(result, chars);
-            // ... Handle string result if necessary ...
+            currentKey = result_str;  // Update currentKey with the result string
         }
         else {  // Other non-primitive types
             jobject result = env->CallObjectMethod(currentObject, method.id);
@@ -279,8 +297,7 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
                     const char* chars = env->GetStringUTFChars(resultStr, nullptr);
                     std::string result_str(chars);
                     env->ReleaseStringUTFChars(resultStr, chars);
-                    // Update currentKey for the next method in the chain
-                    currentKey = result_str;
+                    currentKey = result_str;  // Update currentKey for the next method in the chain
                     // Cache the new method details in methodCache
                     std::string newKey = currentKey + "." + methods.back().substr(0, methods.back().find('('));
                     Method newMethod(method.id, result, methodName, method.signature, method.return_type);
@@ -288,6 +305,7 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
                 }
             }
         }
+
     }
 
     return currentKey;  // The result of the last method in the chain
