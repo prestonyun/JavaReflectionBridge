@@ -13,6 +13,7 @@ void Cache::addMethodToCache(jmethodID methodID, jobject methodObject, const std
 void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
     jclass objectClass = env->GetObjectClass(object);
     if (objectClass == nullptr || env->ExceptionCheck()) {
+        std::cout << "Failed to obtain object class" << std::endl;
         env->ExceptionDescribe();
         env->ExceptionClear();
         return;
@@ -27,8 +28,8 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
 
     jclass classClass = env->FindClass("java/lang/Class");
 
-    jmethodID getDeclaredMethodsMethod = env->GetMethodID(classClass, "getDeclaredMethods", "()[Ljava/lang/reflect/Method;");
-    jobjectArray methodArray = (jobjectArray)env->CallObjectMethod(objectClass, getDeclaredMethodsMethod);
+    jmethodID getMethodsMethod = env->GetMethodID(classClass, "getMethods", "()[Ljava/lang/reflect/Method;");
+    jobjectArray methodArray = (jobjectArray)env->CallObjectMethod(objectClass, getMethodsMethod);
 
     jsize methodCount = env->GetArrayLength(methodArray);
 
@@ -39,15 +40,29 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
             continue;
         }
 
-
         jclass methodClass = env->GetObjectClass(methodObject);
         if (methodClass == nullptr || env->ExceptionCheck()) {
             fprintf(stderr, "Failed to obtain method class at index %d\n", i);
             env->ExceptionClear();
             continue;
         }
+
         jmethodID getNameMethod = env->GetMethodID(methodClass, "getName", "()Ljava/lang/String;");
         jstring nameJavaStr = (jstring)env->CallObjectMethod(methodObject, getNameMethod);
+        const char* nameStr = env->GetStringUTFChars(nameJavaStr, 0);
+        std::string key = className + "." + nameStr;
+
+        if (methodCache.find(key) != methodCache.end()) {
+            std::cout << "Method already cached: " << key << std::endl;
+
+            // Clean up local references
+            env->ReleaseStringUTFChars(nameJavaStr, nameStr);
+            env->DeleteLocalRef(nameJavaStr);
+            env->DeleteLocalRef(methodObject);
+            env->DeleteLocalRef(methodClass);
+
+            continue;  // Skip the rest of the processing for this method and move on to the next method
+        }
 
         jmethodID getParameterTypesMethod = env->GetMethodID(methodClass, "getParameterTypes", "()[Ljava/lang/Class;");
         jobjectArray paramTypeArray = (jobjectArray)env->CallObjectMethod(methodObject, getParameterTypesMethod);
@@ -55,7 +70,7 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
         jmethodID getReturnTypeMethod = env->GetMethodID(methodClass, "getReturnType", "()Ljava/lang/Class;");
         jobject returnTypeObject = env->CallObjectMethod(methodObject, getReturnTypeMethod);
 
-        const char* nameStr = env->GetStringUTFChars(nameJavaStr, 0);
+        
 
         std::string signature = convertToSignature(env, paramTypeArray);
         std::string returnType = convertToReturnType(env, returnTypeObject);
@@ -71,7 +86,7 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
 
         signature += returnType;
 
-        std::string key = className + "." + nameStr;
+        
 
         jmethodID methodExists = env->GetMethodID(objectClass, nameStr, signature.c_str());
         if (env->ExceptionCheck()) {
@@ -91,6 +106,7 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
         Method method(methodID, methodObject, nameStr, signature, returnType);
         methodCache[key] = method;
         std::cout << "Key: " << key << std::endl;
+        std::cout << "Signature: " << signature << std::endl;
 
         // Clean up local references
         env->ReleaseStringUTFChars(nameJavaStr, nameStr);
