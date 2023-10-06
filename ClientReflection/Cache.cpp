@@ -35,6 +35,17 @@ std::string Cache::convertToSignature(JNIEnv* env, jobjectArray paramTypeArray) 
     return signature.str();
 }
 
+std::string Cache::convertToReturnType(JNIEnv* env, jobject returnTypeObject) {
+    if (env->IsInstanceOf(returnTypeObject, env->FindClass("java/lang/Class"))) {
+        jclass returnTypeClass = static_cast<jclass>(returnTypeObject);
+        std::string returnTypeSignature = getClassSignature(env, returnTypeClass);
+        returnTypeSignature = replaceDotsWithSlashes(returnTypeSignature);
+        return returnTypeSignature;
+    }
+    throw std::runtime_error("Invalid returnTypeObject, expected instance of java/lang/Class");
+}
+
+
 
 void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
     jclass objectClass = env->GetObjectClass(object);
@@ -135,13 +146,6 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
     env->DeleteLocalRef(methodArray);
 }
 
-std::string Cache::convertToReturnType(JNIEnv* env, jobject returnTypeObject) {
-    jclass returnTypeClass = static_cast<jclass>(returnTypeObject);
-    std::string returnTypeSignature = getClassSignature(env, returnTypeClass);
-    returnTypeSignature = replaceDotsWithSlashes(returnTypeSignature);
-    return returnTypeSignature;
-}
-
 
 std::string Cache::getClassSignature(JNIEnv* env, jclass clazz) {
     jclass classClass = env->GetObjectClass(clazz);
@@ -151,39 +155,20 @@ std::string Cache::getClassSignature(JNIEnv* env, jclass clazz) {
     std::string nameStrCpp(nameStr);
     std::replace(nameStrCpp.begin(), nameStrCpp.end(), '.', '/');
     std::string signature;
-    if (strcmp(nameStr, "int") == 0) {
-        signature = "I";
+    static const std::unordered_map<std::string, std::string> typeSignatureMap = {
+        {"int", "I"}, {"long", "J"}, {"boolean", "Z"}, {"void", "V"},
+        {"double", "D"}, {"byte", "B"}, {"short", "S"}, {"char", "C"},
+        {"float", "F"}
+    };
+
+    auto it = typeSignatureMap.find(nameStr);
+    if (it != typeSignatureMap.end()) {
+        signature = it->second;
     }
-    else if (strcmp(nameStr, "long") == 0) {
-        signature = "J";
-    }
-    else if (strcmp(nameStr, "boolean") == 0) {
-        signature = "Z";
-    }
-    else if (strcmp(nameStr, "void") == 0) {
-        signature = "V";
-    }
-    else if (strcmp(nameStr, "double") == 0) {
-        signature = "D";
-    }
-    else if (strcmp(nameStr, "byte") == 0) {
-        signature = "B";
-    }
-    else if (strcmp(nameStr, "short") == 0) {
-        signature = "S";
-    }
-    else if (strcmp(nameStr, "char") == 0) {
-		signature = "C";
-	}
-    else if (strcmp(nameStr, "float") == 0) {
-		signature = "F";
-	}
     else if (nameStr[0] == '[') {
-        // Preserve the original array signature as it's already in JNI format
         signature = std::string(nameStr);
     }
     else {
-        // Assume object type
         signature = "L" + nameStrCpp + ";";
     }
     env->ReleaseStringUTFChars(nameJavaStr, nameStr);
@@ -419,5 +404,7 @@ void Cache::cleanup(JNIEnv* env) {
     }
 }
 
-Cache::~Cache() {
+Cache::~Cache(JNIEnv* env) {
+    cleanup(env);  // Assuming env is available or passed to the destructor
 }
+

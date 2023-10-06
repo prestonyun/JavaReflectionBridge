@@ -37,7 +37,7 @@ public:
     void cleanup(JNIEnv* env);
 
     Cache() = default;
-    ~Cache();
+    ~Cache(JNIEnv* env);
 
     std::unordered_map<std::string, Method> methodCache;
     std::unordered_map<std::string, jclass> classCache;
