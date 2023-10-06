@@ -143,6 +143,7 @@ jobject ClientAPI::getClient() {
     }
     checkAndClearException(env);
     this->client = env->NewGlobalRef(client);
+    this->cache->cacheObjectMethods(env, client);
     return client;
 }
 
@@ -154,17 +155,20 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
         MessageBoxW(NULL, L"Invalid state: no env or client", L"Error", MB_OK | MB_ICONERROR);
         return "";
     }
-    this->cache->cacheObjectMethods(env, client);
+    
 
     std::cout << "Total number of methods in methodCache: " << this->cache->methodCache.size() << std::endl;
 
-    std::string response = this->cache->executeMethod(env, instruction);
-    if (env->ExceptionCheck()) {
-        env->ExceptionDescribe();
-		env->ExceptionClear();
-		return "";
-	}
-    std::cout << "Response: " << response << std::endl;
-    return response;
+    
+    try {
+        std::string response = this->cache->executeMethod(env, instruction);
+        return response;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Exception: " << e.what() << '\n';
+    }
+
+    //std::cout << "Response: " << response << std::endl;
+    return "";
 }
 

@@ -6,9 +6,35 @@
 
 void Cache::addMethodToCache(jmethodID methodID, jobject methodObject, const std::string& name, const std::string& signature, const std::string& returnType, const std::string& className) {
     std::string key = className + "." + name;
+    std::cout << "Key to be added: " << key << std::endl;
     Method method(methodID, methodObject, name, signature, returnType);
     methodCache[key] = method;
 }
+
+std::string Cache::replaceDotsWithSlashes(const std::string& input) {
+    std::string output = input;
+    std::replace(output.begin(), output.end(), '.', '/');
+    return output;
+}
+
+std::string Cache::convertToSignature(JNIEnv* env, jobjectArray paramTypeArray) {
+    std::ostringstream signature;
+    signature << "(";
+    jsize paramCount = env->GetArrayLength(paramTypeArray);
+    for (jsize i = 0; i < paramCount; i++) {
+        jobject paramTypeObject = env->GetObjectArrayElement(paramTypeArray, i);
+        if (env->IsInstanceOf(paramTypeObject, env->FindClass("java/lang/Class"))) {
+            jclass paramTypeClass = static_cast<jclass>(paramTypeObject);
+            std::string paramTypeSignature = getClassSignature(env, paramTypeClass);
+            paramTypeSignature = replaceDotsWithSlashes(paramTypeSignature);
+            signature << paramTypeSignature;
+        }
+        env->DeleteLocalRef(paramTypeObject);  // Clean up the local reference
+    }
+    signature << ")";
+    return signature.str();
+}
+
 
 void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
     jclass objectClass = env->GetObjectClass(object);
@@ -53,8 +79,6 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
         std::string key = className + "." + nameStr;
 
         if (methodCache.find(key) != methodCache.end()) {
-            std::cout << "Method already cached: " << key << std::endl;
-
             // Clean up local references
             env->ReleaseStringUTFChars(nameJavaStr, nameStr);
             env->DeleteLocalRef(nameJavaStr);
@@ -75,18 +99,7 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
         std::string signature = convertToSignature(env, paramTypeArray);
         std::string returnType = convertToReturnType(env, returnTypeObject);
 
-        //if (returnType[0] == 'L') {  // It's an object type
-        //    std::string objectClassName = returnType.substr(1, returnType.length() - 2);  // Remove 'L' and ';'
-        //    std::replace(objectClassName.begin(), objectClassName.end(), '/', '.');  // Convert slashes to dots
-        //    if (classCache.find(objectClassName) == classCache.end()) {  // If not already cached
-        //        jclass objectClass = env->FindClass(objectClassName.c_str());
-        //        cacheObjectMethods(env, env->NewGlobalRef(object));  // Recursive caching
-        //    }
-        //}
-
         signature += returnType;
-
-        
 
         jmethodID methodExists = env->GetMethodID(objectClass, nameStr, signature.c_str());
         if (env->ExceptionCheck()) {
@@ -106,7 +119,6 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
         Method method(methodID, methodObject, nameStr, signature, returnType);
         methodCache[key] = method;
         std::cout << "Key: " << key << std::endl;
-        std::cout << "Signature: " << signature << std::endl;
 
         // Clean up local references
         env->ReleaseStringUTFChars(nameJavaStr, nameStr);
@@ -121,33 +133,6 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
     env->DeleteLocalRef(classClass);
     env->DeleteLocalRef(objectClass);
     env->DeleteLocalRef(methodArray);
-}
-
-std::string Cache::replaceDotsWithSlashes(const std::string& input) {
-    std::string output = input;
-    for (size_t pos = 0; pos < output.length(); ++pos) {
-        if (output[pos] == '.') {
-            output[pos] = '/';
-        }
-    }
-    return output;
-}
-
-
-std::string Cache::convertToSignature(JNIEnv* env, jobjectArray paramTypeArray) {
-    std::ostringstream signature;
-    signature << "(";
-    jsize paramCount = env->GetArrayLength(paramTypeArray);
-    for (jsize i = 0; i < paramCount; i++) {
-        jobject paramTypeObject = env->GetObjectArrayElement(paramTypeArray, i);
-        jclass paramTypeClass = static_cast<jclass>(paramTypeObject);
-        std::string paramTypeSignature = getClassSignature(env, paramTypeClass);
-        paramTypeSignature = replaceDotsWithSlashes(paramTypeSignature);
-        signature << paramTypeSignature;
-        env->DeleteLocalRef(paramTypeObject);  // Clean up the local reference
-    }
-    signature << ")";
-    return signature.str();
 }
 
 std::string Cache::convertToReturnType(JNIEnv* env, jobject returnTypeObject) {
@@ -265,6 +250,7 @@ std::string Cache::executeSingleMethod(JNIEnv* env, const std::string& input) {
 std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
     // Split the method chain based on '.' to get individual method calls
     std::vector<std::string> methods;
+    std::cout << "Input: " << input << std::endl;
     size_t pos = 0, found;
     while ((found = input.find('.', pos)) != std::string::npos) {
         methods.push_back(input.substr(pos, found - pos));
@@ -273,54 +259,96 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
     methods.push_back(input.substr(pos));  // Push the last method
 
     std::string currentKey = methods[0]; 
+    std::cout << "Current key: " << currentKey << std::endl;
 
     for (const auto& methodStr : methods) {
         if (methodStr == currentKey) continue;
         std::string methodName = methodStr.substr(0, methodStr.find('('));
         std::string key = currentKey + "." + methodName;
-
+        std::cout << "Key: " << key << std::endl;
         auto it = methodCache.find(key);
         if (it == methodCache.end()) {
             printf("Method %s not found\n", key.c_str());
             return "";
         }
         Method& method = it->second;
-        jobject currentObject = method.object;  // Get the object from the method
+        jobject currentObject = method.object;
+        if (env->ExceptionOccurred()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+            return "";
+        }
 
         // Execute the Method
-        if (method.return_type == "V") {  // void return type
-            env->CallVoidMethod(currentObject, method.id);
-            currentKey = "void";  // Since void methods don't return anything, you might want to set a default value
-        }
-        else if (method.return_type == "I") {  // int return type
-            jint result = env->CallIntMethod(currentObject, method.id);
-            currentKey = std::to_string(result);  // Convert jint to std::string and update currentKey
-        }
-        else if (method.return_type == "Ljava/lang/String;") {  // String return type
-            jstring result = (jstring)env->CallObjectMethod(currentObject, method.id);
-            const char* chars = env->GetStringUTFChars(result, nullptr);
-            std::string result_str(chars);
-            env->ReleaseStringUTFChars(result, chars);
-            currentKey = result_str;  // Update currentKey with the result string
-        }
-        else {  // Other non-primitive types
-            jobject result = env->CallObjectMethod(currentObject, method.id);
-            if (result != nullptr) {
-                jclass resultClass = env->GetObjectClass(result);
-                jmethodID toStringMethod = env->GetMethodID(resultClass, "toString", "()Ljava/lang/String;");
-                if (toStringMethod != nullptr) {
-                    jstring resultStr = (jstring)env->CallObjectMethod(result, toStringMethod);
-                    const char* chars = env->GetStringUTFChars(resultStr, nullptr);
-                    std::string result_str(chars);
-                    env->ReleaseStringUTFChars(resultStr, chars);
-                    currentKey = result_str;  // Update currentKey for the next method in the chain
-                    // Cache the new method details in methodCache
-                    std::string newKey = currentKey + "." + methods.back().substr(0, methods.back().find('('));
-                    Method newMethod(method.id, result, methodName, method.signature, method.return_type);
-                    methodCache[newKey] = newMethod;
+        try {
+            if (method.return_type == "V") {  // void return type
+                env->CallVoidMethod(currentObject, method.id);
+                currentKey = "void";  // Since void methods don't return anything, you might want to set a default value
+            }
+            else if (method.return_type == "I") {  // int return type
+                jint result = env->CallIntMethod(currentObject, method.id);
+                currentKey = std::to_string(result);  // Convert jint to std::string and update currentKey
+            }
+            else if (method.return_type == "Ljava/lang/String;") {  // String return type
+                jstring result = (jstring)env->CallObjectMethod(currentObject, method.id);
+                const char* chars = env->GetStringUTFChars(result, nullptr);
+                std::string result_str(chars);
+                env->ReleaseStringUTFChars(result, chars);
+                currentKey = result_str;  // Update currentKey with the result string
+            }
+            else if (method.return_type == "Z") {
+                jstring result = (jstring)env->CallBooleanMethod(currentObject, method.id);
+                const char* chars = env->GetStringUTFChars(result, nullptr);
+                std::string result_str(chars);
+                env->ReleaseStringUTFChars(result, chars);
+                currentKey = result_str;  // Update currentKey with the result string
+            }
+            else {  // Other non-primitive types
+                jobject result = env->CallObjectMethod(currentObject, method.id);
+                if (env->ExceptionOccurred()) {
+                    env->ExceptionDescribe();
+                    env->ExceptionClear();
+                    return "";
+                }
+                if (result != nullptr) {
+                    jclass resultClass = env->GetObjectClass(result);
+                    if (env->ExceptionOccurred()) {
+                        env->ExceptionDescribe();
+                        env->ExceptionClear();
+                        return "";
+                    }
+                    jmethodID toStringMethod = env->GetMethodID(resultClass, "toString", "()Ljava/lang/String;");
+                    if (env->ExceptionOccurred()) {
+                        env->ExceptionDescribe();
+                        env->ExceptionClear();
+                        return "";
+                    }
+                    if (toStringMethod != nullptr) {
+                        jstring resultStr = (jstring)env->CallObjectMethod(result, toStringMethod);
+                        if (env->ExceptionOccurred()) {
+                            env->ExceptionDescribe();
+                            env->ExceptionClear();
+                            return "";
+                        }
+                        const char* chars = env->GetStringUTFChars(resultStr, nullptr);
+                        std::string result_str(chars);
+                        try {
+                            cacheObjectMethods(env, result);  // Cache the methods of the new object
+                            }
+                        catch (const std::exception& e) {
+                            std::cerr << "Exception: " << e.what() << '\n';
+                        }
+                        env->ReleaseStringUTFChars(resultStr, chars);
+                        return result_str;
+                        
+                    }
                 }
             }
         }
+        catch (const std::exception& e) {
+            std::cerr << "Exception: " << e.what() << '\n';
+        }
+
 
     }
 
@@ -373,7 +401,6 @@ jfieldID Cache::getFieldID(JNIEnv* env, const std::string& key, jclass clazz, co
 }
 
 void Cache::cleanup(JNIEnv* env) {
-    // Iterate through each Method in the methodCache and delete the global reference to the jobject
     for (auto& entry : methodCache) {
         Method& method = entry.second;
         if (method.object != nullptr) {
