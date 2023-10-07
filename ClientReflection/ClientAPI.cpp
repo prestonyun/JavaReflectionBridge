@@ -74,21 +74,23 @@ jobject ClientAPI::getClient() {
 	}
 
     jfieldID injectorField = env->GetStaticFieldID(runeLiteClass, "injector", "Lcom/google/inject/Injector;");
-
+    checkAndClearException(env);
     jobject injector = env->GetStaticObjectField(runeLiteClass, injectorField);
-
+    checkAndClearException(env);
     this->injector = injector;
+    //this->cache->cacheObjectMethods(env, injector);
     jclass injectorClass = this->cache->getClass(env, "InjectorClass", injector);
-
+    checkAndClearException(env);
     jmethodID getInstanceMethod = env->GetMethodID(injectorClass, "getInstance", "(Ljava/lang/Class;)Ljava/lang/Object;");
-
+    checkAndClearException(env);
     jobject runeLiteClient = env->CallObjectMethod(injector, getInstanceMethod, runeLiteClass);
+    checkAndClearException(env);
     jclass runeLiteClientClass = env->GetObjectClass(runeLiteClient);
-
+    checkAndClearException(env);
     jfieldID clientField = env->GetFieldID(runeLiteClientClass, "client", "Lnet/runelite/api/Client;");
-
+    checkAndClearException(env);
     jobject client = env->GetObjectField(runeLiteClient, clientField);
-
+    checkAndClearException(env);
     jclass clientClass = this->cache->getClass(env, "ClientClass", client);
     checkAndClearException(env);
     this->client = env->NewGlobalRef(client);
@@ -110,10 +112,16 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
 
     try {
         return this->cache->executeMethod(env, instruction);
+        checkAndClearException(env);
     }
     catch (const std::exception& e) {
         std::cerr << "Exception: " << e.what() << '\n';
     }
+    if (this->injector != nullptr) {
+        std::cout << "caching injector methods" << std::endl;
+        this->cache->cacheObjectMethods(env, this->injector);
+    }
+    
 
     return "";
 }

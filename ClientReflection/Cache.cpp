@@ -4,6 +4,14 @@
 #include <algorithm>
 #include <iostream>
 
+std::string jstringToString(JNIEnv* env, jstring jStr) {
+    const char* cStr = env->GetStringUTFChars(jStr, nullptr);
+    std::string str(cStr);
+    env->ReleaseStringUTFChars(jStr, cStr);
+    return str;
+}
+
+
 void Cache::addMethodToCache(jmethodID methodID, jobject methodObject, const std::string& name, const std::string& signature, const std::string& returnType, const std::string& className) {
     std::string key = className + "." + name;
     std::cout << "Key to be added: " << key << std::endl;
@@ -55,15 +63,14 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
         env->ExceptionClear();
         return;
     }
-
-    
-    jmethodID getNameMethod = env->GetMethodID(objectClass, "getName", "()Ljava/lang/String;");
-    jstring classNameJava = (jstring)env->CallObjectMethod(object, getNameMethod);
+    jclass classClass = env->FindClass("java/lang/Class");
+    jmethodID getNameMethod = env->GetMethodID(classClass, "getName", "()Ljava/lang/String;");
+    jstring classNameJava = (jstring)env->CallObjectMethod(objectClass, getNameMethod);
     const char* classNameStr = env->GetStringUTFChars(classNameJava, 0);
     std::string className(classNameStr);
     std::cout << "Class name: " << className << std::endl;
 
-    jclass classClass = env->FindClass("java/lang/Class");
+    
 
     jmethodID getMethodsMethod = env->GetMethodID(classClass, "getMethods", "()[Ljava/lang/reflect/Method;");
     jobjectArray methodArray = (jobjectArray)env->CallObjectMethod(objectClass, getMethodsMethod);
@@ -256,7 +263,11 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
             printf("Method %s not found\n", key.c_str());
             return "";
         }
+        else {
+			std::cout << "Method found" << std::endl;
+		}
         Method& method = it->second;
+        std::cout << "Method name: " << method.name << std::endl;
         jobject currentObject = method.object;
         if (env->ExceptionOccurred()) {
             env->ExceptionDescribe();
@@ -264,77 +275,74 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
             return "";
         }
 
-        // Execute the Method
-        try {
-            if (method.return_type == "V") {  // void return type
-                env->CallVoidMethod(currentObject, method.id);
-                currentKey = "void";  // Since void methods don't return anything, you might want to set a default value
+        if (method.return_type == "V") {  // void return type
+            env->CallVoidMethod(currentObject, method.id);
+            currentKey = "void";  // Since void methods don't return anything, you might want to set a default value
+        }
+        else if (method.return_type == "I") {  // int return type
+            jint result = env->CallIntMethod(currentObject, method.id);
+            currentKey = std::to_string(result);  // Convert jint to std::string and update currentKey
+        }
+        else if (method.return_type == "Ljava/lang/String;") {  // String return type
+            jstring result = (jstring)env->CallObjectMethod(currentObject, method.id);
+            const char* chars = env->GetStringUTFChars(result, nullptr);
+            std::string result_str(chars);
+            env->ReleaseStringUTFChars(result, chars);
+            currentKey = result_str;  // Update currentKey with the result string
+        }
+        else if (method.return_type == "Z") {
+            jboolean result = env->CallBooleanMethod(currentObject, method.id);
+            currentKey = result ? "true" : "false";
+        }
+        else {  // Other non-primitive types
+            std::cout << "Other non-primitive types" << std::endl;
+            std::cout << method.id << std::endl;
+            std::cout << currentObject << std::endl;
+            jobject result = env->CallObjectMethod(currentObject, method.id);
+            if (env->ExceptionOccurred()) {
+                env->ExceptionDescribe();
+                env->ExceptionClear();
+                return "";
             }
-            else if (method.return_type == "I") {  // int return type
-                jint result = env->CallIntMethod(currentObject, method.id);
-                currentKey = std::to_string(result);  // Convert jint to std::string and update currentKey
-            }
-            else if (method.return_type == "Ljava/lang/String;") {  // String return type
-                jstring result = (jstring)env->CallObjectMethod(currentObject, method.id);
-                const char* chars = env->GetStringUTFChars(result, nullptr);
-                std::string result_str(chars);
-                env->ReleaseStringUTFChars(result, chars);
-                currentKey = result_str;  // Update currentKey with the result string
-            }
-            else if (method.return_type == "Z") {
-                jstring result = (jstring)env->CallBooleanMethod(currentObject, method.id);
-                const char* chars = env->GetStringUTFChars(result, nullptr);
-                std::string result_str(chars);
-                env->ReleaseStringUTFChars(result, chars);
-                currentKey = result_str;  // Update currentKey with the result string
-            }
-            else {  // Other non-primitive types
-                jobject result = env->CallObjectMethod(currentObject, method.id);
+            if (result != nullptr) {
+                jclass resultClass = env->GetObjectClass(result);
                 if (env->ExceptionOccurred()) {
                     env->ExceptionDescribe();
                     env->ExceptionClear();
                     return "";
                 }
-                if (result != nullptr) {
-                    jclass resultClass = env->GetObjectClass(result);
-                    if (env->ExceptionOccurred()) {
-                        env->ExceptionDescribe();
-                        env->ExceptionClear();
-                        return "";
-                    }
-                    jmethodID toStringMethod = env->GetMethodID(resultClass, "toString", "()Ljava/lang/String;");
-                    if (env->ExceptionOccurred()) {
-                        env->ExceptionDescribe();
-                        env->ExceptionClear();
-                        return "";
-                    }
-                    if (toStringMethod != nullptr) {
-                        jstring resultStr = (jstring)env->CallObjectMethod(result, toStringMethod);
-                        if (env->ExceptionOccurred()) {
-                            env->ExceptionDescribe();
-                            env->ExceptionClear();
-                            return "";
-                        }
-                        const char* chars = env->GetStringUTFChars(resultStr, nullptr);
-                        std::string result_str(chars);
-                        try {
-                            cacheObjectMethods(env, result);  // Cache the methods of the new object
-                            }
-                        catch (const std::exception& e) {
-                            std::cerr << "Exception: " << e.what() << '\n';
-                        }
-                        env->ReleaseStringUTFChars(resultStr, chars);
-                        return result_str;
-                        
-                    }
+                if (resultClass == nullptr) {
+					std::cout << "Result class is null" << std::endl;
+					return "";
+				}
+                jmethodID toStringMethod = env->GetMethodID(resultClass, "toString", "()Ljava/lang/String;");
+                if (toStringMethod == nullptr) {
+                    std::cout << "toStringMethod is null" << std::endl;
+                    return "";
                 }
+                if (env->ExceptionOccurred()) {
+                    env->ExceptionDescribe();
+                    env->ExceptionClear();
+                    return "";
+                }
+
+                jstring resultStr = (jstring)env->CallObjectMethod(result, toStringMethod);
+                if (resultStr == nullptr) {
+					std::cout << "resultStr is null" << std::endl;
+					return "";
+				}
+                if (env->ExceptionOccurred()) {
+                    env->ExceptionDescribe();
+                    env->ExceptionClear();
+                    return "";
+                }
+                const char* chars = env->GetStringUTFChars(resultStr, nullptr);
+                std::string result_str(chars);
+                env->ReleaseStringUTFChars(resultStr, chars);
+                return result_str;
+                        
             }
         }
-        catch (const std::exception& e) {
-            std::cerr << "Exception: " << e.what() << '\n';
-        }
-
-
     }
 
     return currentKey;  // The result of the last method in the chain
@@ -404,7 +412,7 @@ void Cache::cleanup(JNIEnv* env) {
     }
 }
 
-Cache::~Cache(JNIEnv* env) {
-    cleanup(env);  // Assuming env is available or passed to the destructor
+Cache::~Cache() {
+    //cleanup();  // Assuming env is available or passed to the destructor
 }
 
