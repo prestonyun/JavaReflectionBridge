@@ -155,34 +155,67 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
 
 
 std::string Cache::getClassSignature(JNIEnv* env, jclass clazz) {
+    if (env == nullptr || clazz == nullptr) {
+        // handle error
+        throw std::invalid_argument("JNIEnv or jclass argument is nullptr");
+    }
+
     jclass classClass = env->GetObjectClass(clazz);
+    if (classClass == nullptr) {
+        // handle error
+        throw std::runtime_error("Failed to get class object");
+    }
+
     jmethodID getNameMethod = env->GetMethodID(classClass, "getName", "()Ljava/lang/String;");
+    if (getNameMethod == nullptr) {
+        // handle error
+        env->DeleteLocalRef(classClass);
+        throw std::runtime_error("Failed to get method ID for getName");
+    }
+
     jstring nameJavaStr = (jstring)env->CallObjectMethod(clazz, getNameMethod);
+    if (nameJavaStr == nullptr) {
+        // handle error
+        env->DeleteLocalRef(classClass);
+        throw std::runtime_error("Failed to get Java string");
+    }
+
     const char* nameStr = env->GetStringUTFChars(nameJavaStr, 0);
+    if (nameStr == nullptr) {
+        // handle error
+        env->DeleteLocalRef(nameJavaStr);
+        env->DeleteLocalRef(classClass);
+        throw std::runtime_error("Failed to get UTF characters from Java string");
+    }
+
     std::string nameStrCpp(nameStr);
     std::replace(nameStrCpp.begin(), nameStrCpp.end(), '.', '/');
-    std::string signature;
+
     static const std::unordered_map<std::string, std::string> typeSignatureMap = {
         {"int", "I"}, {"long", "J"}, {"boolean", "Z"}, {"void", "V"},
         {"double", "D"}, {"byte", "B"}, {"short", "S"}, {"char", "C"},
         {"float", "F"}
     };
 
-    auto it = typeSignatureMap.find(nameStr);
+    std::string signature;
+    auto it = typeSignatureMap.find(nameStrCpp);
     if (it != typeSignatureMap.end()) {
         signature = it->second;
     }
-    else if (nameStr[0] == '[') {
-        signature = std::string(nameStr);
+    else if (nameStrCpp[0] == '[') {
+        signature = std::string(nameStrCpp);
     }
     else {
         signature = "L" + nameStrCpp + ";";
     }
+
     env->ReleaseStringUTFChars(nameJavaStr, nameStr);
     env->DeleteLocalRef(nameJavaStr);
     env->DeleteLocalRef(classClass);
+
     return signature;
 }
+
 
 std::string Cache::executeSingleMethod(JNIEnv* env, const std::string& input) {
     // 1. Parse the input string to get the class and method name
@@ -242,7 +275,6 @@ std::string Cache::executeSingleMethod(JNIEnv* env, const std::string& input) {
 std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
     // Split the method chain based on '.' to get individual method calls
     std::vector<std::string> methods;
-    std::cout << "Input: " << input << std::endl;
     size_t pos = 0, found;
     while ((found = input.find('.', pos)) != std::string::npos) {
         methods.push_back(input.substr(pos, found - pos));
@@ -251,10 +283,11 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
     methods.push_back(input.substr(pos));  // Push the last method
 
     std::string currentKey = methods[0]; 
-    std::cout << "Current key: " << currentKey << std::endl;
 
     jobject result = nullptr;
     for (const auto& methodStr : methods) {
+        std::cout << "Method string: " << methodStr << std::endl;
+        std::cout << "Current key: " << currentKey << std::endl;
         if (methodStr == currentKey) continue;
         std::string methodName = methodStr.substr(0, methodStr.find('('));
         std::string key = currentKey + "." + methodName;
@@ -262,13 +295,17 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
         auto it = methodCache.find(key);
         if (it == methodCache.end()) {
             printf("Method %s not found\n", key.c_str());
-            return "";
+            return " ";
         }
         else {
 			std::cout << "Method found" << std::endl;
 		}
         Method& method = it->second;
         std::cout << "Method name: " << method.name << std::endl;
+        if (method.object == nullptr || method.id == nullptr) {
+			std::cout << "Method object is null" << std::endl;
+			return "";
+		}
         jobject currentObject = method.object;
         if (env->ExceptionOccurred()) {
             env->ExceptionDescribe();
@@ -296,24 +333,76 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
             currentKey = result ? "true" : "false";
         }
         else {  // Other non-primitive types
+            std::cout << "identified as object return type" << std::endl;
             if (currentObject == nullptr || method.id == nullptr) {
                 std::cout << "Current object or method id is null" << std::endl;
                 return "";
             }
-            result = env->CallObjectMethod(currentObject, method.id);
+            std::cout << "Current object: " << currentObject << std::endl;
+            std::cout << "Method id: " << method.id << std::endl;
+            std::cout << "Method name: " << method.name << std::endl;
+            std::cout << "Method signature: " << method.signature << std::endl;
+            std::cout << "Method return type: " << method.return_type << std::endl;
+            std::cout << "Method object: " << method.object << std::endl;
+            result = env->CallObjectMethod(method.object, method.id);
             if (env->ExceptionOccurred()) {
-                env->ExceptionDescribe();
+                jthrowable exception = env->ExceptionOccurred();
                 env->ExceptionClear();
+
+                jclass throwableClass = env->FindClass("java/lang/Throwable");
+                jmethodID toStringMethod = env->GetMethodID(throwableClass, "toString", "()Ljava/lang/String;");
+                jstring exceptionString = (jstring)env->CallObjectMethod(exception, toStringMethod);
+                std::cout << "Exception: " << exceptionString << std::endl;
+
+                env->DeleteLocalRef(exceptionString);
+                env->DeleteLocalRef(throwableClass);
                 return "";
             }
             if (result != nullptr) {
+                std::cout << "Result is not null" << std::endl;
                 currentObject = result;
                 jclass classClass = env->FindClass("java/lang/Class");
+                if (env->ExceptionOccurred()) {
+                    env->ExceptionDescribe();
+                    env->ExceptionClear();
+                    return "";
+                }
+                std::cout << "classClass: " << classClass << std::endl;
                 jclass objectClass = env->GetObjectClass(currentObject);
+                if (env->ExceptionOccurred()) {
+                    env->ExceptionDescribe();
+                    env->ExceptionClear();
+                    return "";
+                }
                 jmethodID getNameMethod = env->GetMethodID(classClass, "getName", "()Ljava/lang/String;");
+                if (env->ExceptionOccurred()) {
+                    env->ExceptionDescribe();
+                    env->ExceptionClear();
+                    return "";
+                }
+                std::cout << "objectClass: " << objectClass << std::endl;
                 jstring javaResult = (jstring)env->CallObjectMethod(objectClass, getNameMethod);
+                if (env->ExceptionOccurred()) {
+                    env->ExceptionDescribe();
+                    env->ExceptionClear();
+                    return "";
+                }
+                std::cout << "javaResult: " << javaResult << std::endl;
+                if (javaResult == nullptr) {
+					std::cout << "javaResult is null" << std::endl;
+					return "";
+				}
                 const char* nameStr = env->GetStringUTFChars(javaResult, 0);
+                if (env->ExceptionOccurred()) {
+                    env->ExceptionDescribe();
+                    env->ExceptionClear();
+                    return "";
+                }
+                if (nameStr == nullptr) {
+                    std::cout << "nameStr is null" << std::endl;
+                }
                 std::string nameStrCpp(nameStr);
+                std::cout << "new current object: " << nameStrCpp << std::endl;
                 currentKey = nameStrCpp;
                 cacheObjectMethods(env, currentObject);
             }
