@@ -6,6 +6,9 @@ project(ClientReflection)
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
 
+# add the include directory to the list of directories to be searched for header files
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 # add the executable
 add_library(ClientReflection SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/ClientReflection/Cache.cpp
