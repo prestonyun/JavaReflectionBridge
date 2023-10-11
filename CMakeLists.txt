@@ -4,10 +4,12 @@ cmake_minimum_required(VERSION 3.10)
 project(ClientReflection)
 
 # specify the C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 # add the include directory to the list of directories to be searched for header files
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/win32)
 
 # add the executable
 add_library(ClientReflection SHARED
