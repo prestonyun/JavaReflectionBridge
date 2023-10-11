@@ -8,10 +8,10 @@ set(CMAKE_CXX_STANDARD 17)
 
 # add the executable
 add_library(ClientReflection SHARED
-    Cache.cpp
-    ClientAPI.cpp
-    Pipeline.cpp
-    dllmain.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Cache.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ClientAPI.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Pipeline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/dllmain.cpp
 )
 
 set_target_properties(ClientReflection PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
