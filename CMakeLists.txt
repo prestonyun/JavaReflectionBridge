@@ -14,6 +14,8 @@ add_library(ClientReflection SHARED
     dllmain.cpp
 )
 
+set_target_properties(ClientReflection PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+
 target_include_directories(ClientReflection PUBLIC
     ${PROJECT_SOURCE_DIR}
 )
