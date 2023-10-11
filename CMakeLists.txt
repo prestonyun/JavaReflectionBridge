@@ -19,7 +19,7 @@ add_library(ClientReflection SHARED
 
 set_target_properties(ClientReflection PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 
-target_link_libraries(ClientReflection "C:/Program Files/Java/jdk1.8.0_281/lib/jvm.lib")
+target_link_libraries(ClientReflection "${PROJECT_SOURCE_DIR}/libs/jvm.lib")
 
 target_include_directories(ClientReflection PUBLIC
     ${PROJECT_SOURCE_DIR}
