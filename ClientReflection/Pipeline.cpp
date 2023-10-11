@@ -26,23 +26,7 @@ void Pipeline::StartServer() {
         NULL);
 
     if (hPipe == INVALID_HANDLE_VALUE) {
-        DWORD error = GetLastError();
-        LPVOID lpMsgBuf = nullptr;
 
-        FormatMessage(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-            NULL,
-            error,
-            0, // Default language
-            (LPWSTR)&lpMsgBuf,
-            0,
-            NULL
-        );
-
-        // Display the error message in a message box
-        MessageBox(NULL, (LPCTSTR)lpMsgBuf, L"Error", MB_OK | MB_ICONERROR);
-
-        LocalFree(lpMsgBuf);
         exit(1);
     }
 }
