@@ -11,8 +11,11 @@ Pipeline::~Pipeline() {
 }
 
 void Pipeline::StartServer() {
+    std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+    std::string narrowPipeName = converter.to_bytes(pipeName);
+
     hPipe = CreateNamedPipe(
-        pipeName.c_str(),
+        narrowPipeName.c_str(),
         PIPE_ACCESS_DUPLEX,
         PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
         PIPE_UNLIMITED_INSTANCES,
