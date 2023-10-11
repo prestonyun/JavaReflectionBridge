@@ -367,3 +367,6 @@ CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 *.cmake
+
+# Ignore objects.txt files
+objects.txt
