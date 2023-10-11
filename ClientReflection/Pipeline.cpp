@@ -11,8 +11,9 @@ Pipeline::~Pipeline() {
 }
 
 void Pipeline::StartServer() {
-    std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
-    std::string narrowPipeName = converter.to_bytes(pipeName);
+    int size_needed = WideCharToMultiByte(CP_UTF8, 0, pipeName.c_str(), (int)pipeName.size(), NULL, 0, NULL, NULL);
+    std::string narrowPipeName(size_needed, 0);
+    WideCharToMultiByte(CP_UTF8, 0, pipeName.c_str(), (int)pipeName.size(), &narrowPipeName[0], size_needed, NULL, NULL);
 
     hPipe = CreateNamedPipe(
         narrowPipeName.c_str(),
