@@ -11,7 +11,6 @@ std::string jstringToString(JNIEnv* env, jstring jStr) {
     return str;
 }
 
-
 void Cache::addMethodToCache(jmethodID methodID, jobject methodObject, const std::string& name, const std::string& signature, const std::string& returnType, const std::string& className) {
     std::string key = className + "." + name;
     std::cout << "Key to be added: " << key << std::endl;
@@ -53,8 +52,6 @@ std::string Cache::convertToReturnType(JNIEnv* env, jobject returnTypeObject) {
     throw std::runtime_error("Invalid returnTypeObject, expected instance of java/lang/Class");
 }
 
-
-
 void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
     jclass objectClass = env->GetObjectClass(object);
     if (objectClass == nullptr || env->ExceptionCheck()) {
@@ -69,8 +66,6 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
     const char* classNameStr = env->GetStringUTFChars(classNameJava, 0);
     std::string className(classNameStr);
     std::cout << "Class name: " << className << std::endl;
-
-    
 
     jmethodID getMethodsMethod = env->GetMethodID(classClass, "getMethods", "()[Ljava/lang/reflect/Method;");
     jobjectArray methodArray = (jobjectArray)env->CallObjectMethod(objectClass, getMethodsMethod);
@@ -112,8 +107,6 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
         jmethodID getReturnTypeMethod = env->GetMethodID(methodClass, "getReturnType", "()Ljava/lang/Class;");
         jobject returnTypeObject = env->CallObjectMethod(methodObject, getReturnTypeMethod);
 
-        
-
         std::string signature = convertToSignature(env, paramTypeArray);
         std::string returnType = convertToReturnType(env, returnTypeObject);
 
@@ -152,7 +145,6 @@ void Cache::cacheObjectMethods(JNIEnv* env, jobject object) {
     env->DeleteLocalRef(objectClass);
     env->DeleteLocalRef(methodArray);
 }
-
 
 std::string Cache::getClassSignature(JNIEnv* env, jclass clazz) {
     if (env == nullptr || clazz == nullptr) {
@@ -520,4 +512,3 @@ void Cache::cleanup(JNIEnv* env) {
 Cache::~Cache() {
     //cleanup();  // Assuming env is available or passed to the destructor
 }
-
