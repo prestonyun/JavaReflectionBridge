@@ -7,15 +7,11 @@ JNIEXPORT void JNICALL Java_SomeEntryPoint_nativeTask(JNIEnv* env, jobject) {
     
     jobject clientThreadInstance = env->CallStaticObjectMethod(clientThreadClass, getInstanceMethod);
 
-    // Create a Runnable for the task you want to execute
-    jclass runnableClass = env->FindClass("java/lang/Runnable");
-    jmethodID runnableInit = env->GetMethodID(runnableClass, "<init>", "()V");
-    jobject runnableObj = env->NewObject(runnableClass, runnableInit);
+    // Create a task using a lambda function or any other way
+    std::function<void()> task = []() {
+        // Define your task here
+    };
 
-    // TODO: Set up the actual task you want the Runnable to perform
-    // ...
-
-    // Invoke the 'invoke' method on the ClientThread instance
-    jmethodID invokeMethod = env->GetMethodID(clientThreadClass, "invoke", "(Ljava/lang/Runnable;)V");
-    env->CallVoidMethod(clientThreadInstance, invokeMethod, runnableObj);
+    // Use the ClientAPI instance to invoke the task on the client thread
+    clientAPI->invokeOnClientThread(task);
 }
