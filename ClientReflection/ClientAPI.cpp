@@ -308,9 +308,11 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
         checkAndClearException(env);
     }
     catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << '\n';
+        std::ostringstream oss;
+        oss << "Exception caught in ClientAPI.cpp: " << e.what();
+        throw std::runtime_error(oss.str());
     }
     
 
-    return "";
+    return "failure";
 }

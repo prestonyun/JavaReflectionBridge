@@ -326,7 +326,7 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
         }
         else {  // Other non-primitive types
             std::cout << "identified as object return type" << std::endl;
-            if (currentObject == nullptr || method.id == nullptr) {
+            if (currentObject == nullptr || method.id == nullptr || method.object == nullptr) {
                 std::cout << "Current object or method id is null" << std::endl;
                 return "";
             }
@@ -339,15 +339,22 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
             result = env->CallObjectMethod(method.object, method.id);
             if (env->ExceptionOccurred()) {
                 jthrowable exception = env->ExceptionOccurred();
-                env->ExceptionClear();
+                env->ExceptionDescribe();
+                
 
                 jclass throwableClass = env->FindClass("java/lang/Throwable");
                 jmethodID toStringMethod = env->GetMethodID(throwableClass, "toString", "()Ljava/lang/String;");
+                jmethodID printStackTraceMethod = env->GetMethodID(throwableClass, "printStackTrace", "()V");
+                env->CallVoidMethod(exception, printStackTraceMethod);
                 jstring exceptionString = (jstring)env->CallObjectMethod(exception, toStringMethod);
-                std::cout << "Exception: " << exceptionString << std::endl;
 
+                const char* message = env->GetStringUTFChars(exceptionString, NULL);
+                std::cout << "Exception caught in Cache.cpp: " << message << std::endl;
+
+                env->ReleaseStringUTFChars(exceptionString, message);
                 env->DeleteLocalRef(exceptionString);
                 env->DeleteLocalRef(throwableClass);
+                env->ExceptionClear();
                 return "";
             }
             if (result != nullptr) {

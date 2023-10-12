@@ -370,3 +370,5 @@ cmake_install.cmake
 
 # Ignore objects.txt files
 objects.txt
+
+.aider.chat.history.md
