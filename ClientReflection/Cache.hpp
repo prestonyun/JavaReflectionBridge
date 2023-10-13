@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <string>
 #include <sstream>
+#include "ClientThread.hpp"
 
 class Cache {
 public:
@@ -14,6 +15,7 @@ public:
         std::string name;
         std::string signature;
         std::string return_type;
+        ClientThread* clientThread;
 
         Method() : id(nullptr), object(nullptr) {}
         Method(jmethodID id, jobject object, const std::string& name, const std::string& signature, const std::string& return_type)

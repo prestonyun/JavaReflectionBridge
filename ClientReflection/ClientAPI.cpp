@@ -54,7 +54,6 @@ ClientAPI::ClientAPI() {
         DisplayErrorMessage(L"Failed to attach to JVM");
         exit(1);
     }
-
 }
 
 bool ClientAPI::AttachToThread(JNIEnv** Thread)
@@ -316,8 +315,3 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
 
     return "failure";
 }
-    // Add this method to the ClientAPI class
-    void ClientAPI::invokeOnClientThread(std::function<void()> task) {
-        // Convert the std::function to a Runnable and invoke it on the client thread
-        // ...
-    }
