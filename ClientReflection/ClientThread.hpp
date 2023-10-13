@@ -16,39 +16,15 @@ extern "C" JNIEXPORT void JNICALL Java_Path_To_Callback_RunTask(JNIEnv*, jclass)
 
 class ClientThread {
 public:
-    ClientThread(JNIEnv* env) {
-        clientThreadClass = env->FindClass("net/runelite/client/callback/ClientThread");
-        jclass runeLiteClass = env->FindClass("net/runelite/client/RuneLite");
-        jfieldID injectorField = env->GetStaticFieldID(runeLiteClass, "injector", "Lcom/google/inject/Injector;");
-        injector = env->GetStaticObjectField(runeLiteClass, injectorField);
-        jclass injectorClass = env->GetObjectClass(injector)
-        jmethodID getInstanceMethod = env->GetMethodID(injectorClass, "getInstance", "(Ljava/lang/Class;)Ljava/lang/Object;");
-        clientThread = env->CallObjectMethod(injector, getInstanceMethod, clientThreadClass);
-    }
+    ClientThread(JNIEnv* env)
+    ClientThread(JNIEnv* env, jobject client)
     ~ClientThread() {
         env->DeleteLocalRef(clientThreadClass);
         env->DeleteLocalRef(clientThread);
     }
-    void invokeOnClientThread(std::function<void()> task) {
-        jobject runnable = createRunnable(task);
-        
-        if (!invokeMethod) {
-            invokeMethod = env->GetMethodID(clientThreadClass, "invoke", "(Ljava/lang/Runnable;)V");
-        }
-        env->CallVoidMethod(clientThread, invokeMethod, runnable);
+    void invokeOnClientThread(std::function<void()> task)
 
-        env->DeleteLocalRef(runnable);
-    }
-
-    jobject createRunnable(std::function<void()> task) {
-        currentTask = task;
-        
-        // Create a new Runnable using an anonymous subclass
-        std::string runnableCode = "(Ljava/lang/Object;)Ljava/lang/Runnable;";
-        jmethodID ctor = env->GetMethodID(clientThreadClass, "<init>", "()V");
-        jobject newRunnable = env->NewObject(clientThreadClass, ctor);
-        return newRunnable;
-    }
+    jobject createRunnable(std::function<void()> task)
 
 
 

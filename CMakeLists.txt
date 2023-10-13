@@ -14,6 +14,7 @@ include_directories(
 # add the executable
 add_library(ClientReflection SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/ClientReflection/Cache.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ClientReflection/ClientThread.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ClientReflection/ClientAPI.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ClientReflection/Pipeline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ClientReflection/dllmain.cpp

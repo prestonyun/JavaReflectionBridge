@@ -4,6 +4,9 @@
     <ClCompile Include="E:\SynapseVault\ClientReflection\ClientReflection\Cache.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="E:\SynapseVault\ClientReflection\ClientReflection\ClientThread.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="E:\SynapseVault\ClientReflection\ClientReflection\ClientAPI.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
