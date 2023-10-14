@@ -6,7 +6,6 @@
 #include <memory>
 #include <functional>
 
-
 void DisplayErrorMessage(const std::wstring& message) {
     MessageBoxW(NULL, message.c_str(), L"Error", MB_OK | MB_ICONERROR);
 }
@@ -135,7 +134,6 @@ bool ClientAPI::Initialize() noexcept
 
                 for (jint i = 0; i < len; ++i)
                 {
-                    //Some java.awt.Panel.
                     auto component = make_safe_local<jobject>(env->GetObjectArrayElement(components.get(), i));
                     auto applet_class = make_safe_local<jclass>(env->FindClass("java/applet/Applet"));
                     if (env->IsInstanceOf(component.get(), applet_class.get()))
@@ -311,7 +309,6 @@ std::string ClientAPI::ProcessInstruction(const std::string& instruction) {
         oss << "Exception caught in ClientAPI.cpp: " << e.what();
         throw std::runtime_error(oss.str());
     }
-    
 
     return "failure";
 }
