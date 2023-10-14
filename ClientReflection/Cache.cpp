@@ -298,6 +298,8 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
 			std::cout << "Method object is null" << std::endl;
 			return "";
 		}
+        std::cout << "Method return type: " << method.return_type << std::endl;
+        std::cout << "Method signature: " << method.signature << std::endl;
         jobject currentObject = method.object;
         if (env->ExceptionOccurred()) {
             env->ExceptionDescribe();
@@ -322,6 +324,11 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
         }
         else if (method.return_type == "Z") {
             jboolean result = env->CallBooleanMethod(currentObject, method.id);
+            if (env->ExceptionOccurred()) {
+                env->ExceptionDescribe();
+                env->ExceptionClear();
+                return "";
+            }
             currentKey = result ? "true" : "false";
         }
         else {  // Other non-primitive types
@@ -330,12 +337,7 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
                 std::cout << "Current object or method id is null" << std::endl;
                 return "";
             }
-            std::cout << "Current object: " << currentObject << std::endl;
-            std::cout << "Method id: " << method.id << std::endl;
-            std::cout << "Method name: " << method.name << std::endl;
-            std::cout << "Method signature: " << method.signature << std::endl;
-            std::cout << "Method return type: " << method.return_type << std::endl;
-            std::cout << "Method object: " << method.object << std::endl;
+
             result = env->CallObjectMethod(method.object, method.id);
             if (env->ExceptionOccurred()) {
                 jthrowable exception = env->ExceptionOccurred();
