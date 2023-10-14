@@ -247,7 +247,6 @@ std::string Cache::executeSingleMethod(JNIEnv* env, const std::string& input) {
     else {  // Other non-primitive types
         jobject result = env->CallObjectMethod(method.object, method.id);
         if (result != nullptr) {
-            printf("Result is not null\n");
             jclass resultClass = env->GetObjectClass(result);
             jmethodID toStringMethod = env->GetMethodID(resultClass, "toString", "()Ljava/lang/String;");
             if (toStringMethod != nullptr) {
@@ -290,14 +289,14 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
             return " ";
         }
         else {
-			std::cout << "Method found" << std::endl;
-		}
+            std::cout << "Method found" << std::endl;
+        }
         Method& method = it->second;
         std::cout << "Method name: " << method.name << std::endl;
         if (method.object == nullptr || method.id == nullptr) {
-			std::cout << "Method object is null" << std::endl;
-			return "";
-		}
+            std::cout << "Method object is null" << std::endl;
+            return "";
+        }
         std::cout << "Method return type: " << method.return_type << std::endl;
         std::cout << "Method signature: " << method.signature << std::endl;
         jobject currentObject = method.object;
@@ -342,7 +341,6 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
             if (env->ExceptionOccurred()) {
                 jthrowable exception = env->ExceptionOccurred();
                 env->ExceptionDescribe();
-                
 
                 jclass throwableClass = env->FindClass("java/lang/Throwable");
                 jmethodID toStringMethod = env->GetMethodID(throwableClass, "toString", "()Ljava/lang/String;");
@@ -390,9 +388,9 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
                 }
                 std::cout << "javaResult: " << javaResult << std::endl;
                 if (javaResult == nullptr) {
-					std::cout << "javaResult is null" << std::endl;
-					return "";
-				}
+                    std::cout << "javaResult is null" << std::endl;
+                    return "";
+                }
                 const char* nameStr = env->GetStringUTFChars(javaResult, 0);
                 if (env->ExceptionOccurred()) {
                     env->ExceptionDescribe();
@@ -410,9 +408,9 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
         }
     }
     if (result == nullptr) {
-		std::cout << "Result is null" << std::endl;
-		return "";
-	}
+        std::cout << "Result is null" << std::endl;
+        return "";
+    }
     jclass resultClass = env->GetObjectClass(result);
     if (env->ExceptionOccurred()) {
         env->ExceptionDescribe();
