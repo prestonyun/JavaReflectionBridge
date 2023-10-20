@@ -336,7 +336,7 @@ std::string Cache::executeMethod(JNIEnv* env, const std::string& input) {
                 std::cout << "Current object or method id is null" << std::endl;
                 return "";
             }
-
+            // TODO: This call is failing due to runtime-polymorphism. Fix it.
             result = env->CallObjectMethod(method.object, method.id);
             if (env->ExceptionOccurred()) {
                 jthrowable exception = env->ExceptionOccurred();
